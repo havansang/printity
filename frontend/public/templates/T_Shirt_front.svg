@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 900" width="800" height="900">
+  <defs>
+    <linearGradient id="shirtGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d0d0d0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b8b8b8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sleeveLeft" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#c0c0c0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a8a8a8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sleeveRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c0c0c0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a8a8a8;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.15)" />
+    </filter>
+  </defs>
+
+  <!-- Main shirt body -->
+  <path d="
+    M 220 120
+    C 270 110, 310 90, 340 60
+    C 360 40, 390 25, 400 20
+    C 410 25, 440 40, 460 60
+    C 490 90, 530 110, 580 120
+    L 680 180
+    L 680 320
+    L 580 280
+    L 580 860
+    L 220 860
+    L 220 280
+    L 120 320
+    L 120 180
+    Z
+  " fill="url(#shirtGrad)" stroke="#aaaaaa" stroke-width="1.5" filter="url(#shadow)" />
+
+  <!-- Left sleeve shading -->
+  <path d="M 220 120 L 120 180 L 120 320 L 220 280 Z" fill="url(#sleeveLeft)" stroke="#aaaaaa" stroke-width="1" />
+
+  <!-- Right sleeve shading -->
+  <path d="M 580 120 L 680 180 L 680 320 L 580 280 Z" fill="url(#sleeveRight)" stroke="#aaaaaa" stroke-width="1" />
+
+  <!-- Collar -->
+  <path d="
+    M 220 120
+    C 270 110, 310 90, 340 60
+    C 360 40, 380 32, 400 28
+    C 420 32, 440 40, 460 60
+    C 490 90, 530 110, 580 120
+    C 540 115, 500 125, 470 150
+    C 450 165, 430 175, 400 180
+    C 370 175, 350 165, 330 150
+    C 300 125, 260 115, 220 120
+    Z
+  " fill="#bbbbbb" stroke="#aaaaaa" stroke-width="1" />
+
+  <!-- Collar seam line -->
+  <path d="
+    M 310 108
+    C 340 120, 370 145, 400 150
+    C 430 145, 460 120, 490 108
+  " fill="none" stroke="#999999" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6" />
+
+  <!-- Side seams -->
+  <line x1="220" y1="280" x2="220" y2="860" stroke="#aaaaaa" stroke-width="1" opacity="0.5" />
+  <line x1="580" y1="280" x2="580" y2="860" stroke="#aaaaaa" stroke-width="1" opacity="0.5" />
+
+  <!-- Bottom hem -->
+  <line x1="220" y1="850" x2="580" y2="850" stroke="#aaaaaa" stroke-width="2" opacity="0.6" />
+</svg>
