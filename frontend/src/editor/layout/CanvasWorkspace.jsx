@@ -14,6 +14,8 @@ export default function CanvasWorkspace() {
     const rafRef = useRef(null);
     const loadIdRef = useRef(0);
     const basePrintAreaRef = useRef({ x: 0, y: 0 });
+    const pushHistoryRef = useRef(null);
+    const syncLayersRef = useRef(null);
 
     const {
         setCanvas, syncLayers, setSelectedLayerId,
@@ -26,6 +28,14 @@ export default function CanvasWorkspace() {
     } = useEditor();
 
     const [svgRevision, setSvgRevision] = useState(0);
+
+    useEffect(() => {
+        pushHistoryRef.current = pushHistory;
+    }, [pushHistory]);
+
+    useEffect(() => {
+        syncLayersRef.current = syncLayers;
+    }, [syncLayers]);
 
     const measurePrintArea = useCallback(() => {
         const sceneEl = sceneRef.current;
@@ -123,9 +133,6 @@ export default function CanvasWorkspace() {
             currentSvgNode.replaceWith(nextSvg);
             svgRef.current = nextSvg;
 
-            // FIX: remove white fill but keep border
-
-
             setSvgRevision((v) => v + 1);
             queueAlign();
         } catch (error) {
@@ -149,7 +156,7 @@ export default function CanvasWorkspace() {
         const canvas = new Canvas(el, {
             width: CANVAS_W,
             height: CANVAS_H,
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(0,0,0,0)',
             selection: true,
         });
         fabricRef.current = canvas;
@@ -162,17 +169,25 @@ export default function CanvasWorkspace() {
             setSelectedObject(active ?? null);
         };
         const onCleared = () => { setSelectedLayerId(null); setSelectedObject(null); };
-        const onModified = () => { syncLayers(); pushHistory(); };
+        const onModified = () => {
+            syncLayersRef.current?.();
+            pushHistoryRef.current?.();
+        };
         const onTextChanged = () => { const a = canvas.getActiveObject(); setSelectedObject(a ?? null); };
+        const onTextEditingExited = () => {
+            syncLayersRef.current?.();
+            pushHistoryRef.current?.();
+        };
 
         canvas.on('selection:created', onSelected);
         canvas.on('selection:updated', onSelected);
         canvas.on('selection:cleared', onCleared);
         canvas.on('object:modified', onModified);
         canvas.on('text:changed', onTextChanged);
+        canvas.on('text:editing:exited', onTextEditingExited);
 
         setCanvas(canvas);
-        pushHistory();
+        pushHistoryRef.current?.();
         queueAlign();
 
         return () => {
@@ -181,6 +196,7 @@ export default function CanvasWorkspace() {
             canvas.off('selection:cleared', onCleared);
             canvas.off('object:modified', onModified);
             canvas.off('text:changed', onTextChanged);
+            canvas.off('text:editing:exited', onTextEditingExited);
             canvas.dispose();
             fabricRef.current = null;
         };
@@ -190,6 +206,13 @@ export default function CanvasWorkspace() {
     useEffect(() => {
         syncViewportToPrintArea();
     }, [syncViewportToPrintArea]);
+
+    useEffect(() => {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+        canvas.backgroundColor = 'rgba(0,0,0,0)';
+        canvas.requestRenderAll();
+    }, [activeSurface]);
 
     /* ── print-area measurement + observer ───────────────────── */
     useEffect(() => {

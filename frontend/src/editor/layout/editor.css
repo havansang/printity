@@ -643,7 +643,7 @@
 }
 
 .scene .canvas-container canvas {
-  background: #ffffff;
+  background: transparent !important;
 }
 
 .surface-tabs {

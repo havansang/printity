@@ -45,6 +45,7 @@ export function EditorProvider({ children }) {
 
     /* ---------- multi-surface ---------------------------------------- */
     const [activeSurface, setActiveSurface] = useState('front');
+    const activeSurfaceRef = useRef('front');
     const surfaceDataRef = useRef({ front: null, back: null });
 
     /* ---------- template --------------------------------------------- */
@@ -85,6 +86,10 @@ export function EditorProvider({ children }) {
         fontWeight: 'normal', fontStyle: 'normal', textAlign: 'left', isText: false,
     };
     const [textStyle, setTextStyle] = useState(DEFAULT_TEXT_STYLE);
+
+    useEffect(() => {
+        activeSurfaceRef.current = activeSurface;
+    }, [activeSurface]);
 
     /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -191,10 +196,12 @@ export function EditorProvider({ children }) {
         const canvas = canvasRef.current;
         if (!canvas) return;
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+        const surface = activeSurfaceRef.current;
+        const snapshot = canvas.toJSON(CUSTOM_PROPS);
         autoSaveTimer.current = setTimeout(() => {
-            surfaceDataRef.current[activeSurface] = canvas.toJSON(CUSTOM_PROPS);
+            surfaceDataRef.current[surface] = snapshot;
         }, AUTO_SAVE_DELAY);
-    }, [activeSurface]);
+    }, []);
 
     /* ── undo / redo ─────────────────────────────────────────────── */
 
@@ -235,8 +242,8 @@ export function EditorProvider({ children }) {
 
         /* ── auto-save hooks ── */
         canvas.on('object:added', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
-        canvas.on('object:modified', () => _triggerAutoSave());
-        canvas.on('object:removed', () => _triggerAutoSave());
+        canvas.on('object:modified', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
+        canvas.on('object:removed', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
 
         /* ── pan mode mouse hooks (attached once) ── */
         canvas.on('mouse:down', (opt) => {
@@ -511,13 +518,20 @@ export function EditorProvider({ children }) {
 
     const switchSurface = useCallback(async (target) => {
         const canvas = canvasRef.current;
-        if (!canvas || target === activeSurface) return;
-        surfaceDataRef.current[activeSurface] = canvas.toJSON(CUSTOM_PROPS);
+        const fromSurface = activeSurfaceRef.current;
+        if (!canvas || target === fromSurface) return;
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+        _isRestoringHistory.current = true;
+        surfaceDataRef.current[fromSurface] = canvas.toJSON(CUSTOM_PROPS);
         canvas.clear();
         const targetJson = surfaceDataRef.current[target];
         if (targetJson) await canvas.loadFromJSON(targetJson);
         canvas.backgroundColor = '#ffffff';
         canvas.requestRenderAll();
+        _isRestoringHistory.current = false;
+
+        activeSurfaceRef.current = target;
         setActiveSurface(target);
         setSelectedLayerId(null);
         setSelectedObjectType(null);
@@ -526,7 +540,7 @@ export function EditorProvider({ children }) {
         const th = historyRef.current[target];
         setCanUndo(th.pointer > 0);
         setCanRedo(th.pointer < th.stack.length - 1);
-    }, [activeSurface, syncLayers]);
+    }, [syncLayers]);
 
     /* ── value ───────────────────────────────────────────────────── */
 
