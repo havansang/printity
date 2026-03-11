@@ -82,8 +82,6 @@ export function EditorProvider({ children }) {
     /* ---------- canvas interaction mode ----------------------------- */
     const [isPanMode, setIsPanMode] = useState(false);
     const isPanRef = useRef(false);
-    const isPanningRef = useRef(false);
-    const lastPanPoint = useRef({ x: 0, y: 0 });
 
     /* ---------- zoom ------------------------------------------------- */
     const [zoomLevel, setZoomLevel] = useState(1);
@@ -279,21 +277,6 @@ export function EditorProvider({ children }) {
         canvas.on('object:removed', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
 
         /* ── pan mode mouse hooks (attached once) ── */
-        canvas.on('mouse:down', (opt) => {
-            if (!isPanRef.current) return;
-            isPanningRef.current = true;
-            lastPanPoint.current = { x: opt.e.clientX, y: opt.e.clientY };
-        });
-        canvas.on('mouse:move', (opt) => {
-            if (!isPanRef.current || !isPanningRef.current) return;
-            const vpt = canvas.viewportTransform.slice();
-            vpt[4] += opt.e.clientX - lastPanPoint.current.x;
-            vpt[5] += opt.e.clientY - lastPanPoint.current.y;
-            canvas.setViewportTransform(vpt);
-            lastPanPoint.current = { x: opt.e.clientX, y: opt.e.clientY };
-        });
-        canvas.on('mouse:up', () => { isPanningRef.current = false; });
-
         syncLayers();
     }, [syncLayers, _constrainObject, _triggerAutoSave]);
 
@@ -413,6 +396,7 @@ export function EditorProvider({ children }) {
             }
             canvas.add(fabricImg);
             canvas.setActiveObject(fabricImg);
+            canvas.viewportCenterObject(fabricImg)
             canvas.requestRenderAll();
             syncLayers();
             pushHistory();

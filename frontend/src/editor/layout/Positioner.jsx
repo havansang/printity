@@ -4,7 +4,7 @@ import { useEditor } from './EditorContext';
 const WHEEL_ZOOM_STEP = 1.1;
 
 export default function Positioner({ children }) {
-    const { zoomLevel, applyZoom } = useEditor();
+    const { zoomLevel, applyZoom, isPanMode } = useEditor();
     const [pos, setPos] = useState({ x: 0, y: 0 });
 
     const spacePressedRef = useRef(false);
@@ -35,7 +35,8 @@ export default function Positioner({ children }) {
     };
 
     const mouseDown = (e) => {
-        if (!spacePressedRef.current) return;
+        if (!spacePressedRef.current && !isPanMode) return;
+        e.preventDefault();
         draggingRef.current = true;
         startRef.current = {
             x: e.clientX - pos.x,
@@ -68,6 +69,7 @@ export default function Positioner({ children }) {
                 className="positioner"
                 style={{
                     transform: `translate(${pos.x}px,${pos.y}px) scale(${zoomLevel})`,
+                    cursor: (isPanMode || spacePressedRef.current) ? 'grab' : 'default',
                 }}
             >
                 {children}
