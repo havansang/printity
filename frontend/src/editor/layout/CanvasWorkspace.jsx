@@ -4,7 +4,7 @@ import { useEditor } from './EditorContext';
 import Positioner from './Positioner';
 
 const CANVAS_W = 360;
-const CANVAS_H = 560;
+const CANVAS_H = 408;
 
 export default function CanvasWorkspace() {
     const sceneRef = useRef(null);
@@ -66,14 +66,18 @@ export default function CanvasWorkspace() {
         if (!pa) return;
 
         const wrapper = canvas.wrapperEl;
-        const scaleX = pa.width / CANVAS_W;
-        const scaleY = pa.height / CANVAS_H;
+        const sourceW = canvas.getWidth() || CANVAS_W;
+        const sourceH = canvas.getHeight() || CANVAS_H;
+        const scale = pa.width / sourceW;
+        const renderH = sourceH * scale;
+        const left = pa.left;
+        const top = pa.top + (pa.height - renderH) / 2;
 
         wrapper.style.position = 'absolute';
-        wrapper.style.left = `${pa.left}px`;
-        wrapper.style.top = `${pa.top}px`;
+        wrapper.style.left = `${left}px`;
+        wrapper.style.top = `${top}px`;
         wrapper.style.transformOrigin = 'top left';
-        wrapper.style.transform = `scale(${scaleX}, ${scaleY})`;
+        wrapper.style.transform = `scale(${scale})`;
         wrapper.style.zIndex = '2';
     }, [measurePrintArea]);
 

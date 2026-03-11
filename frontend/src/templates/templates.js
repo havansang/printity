@@ -6,7 +6,7 @@ export const templates = {
                 x: 220,
                 y: 260,
                 width: 360,
-                height: 560
+                height: 408
             }
         },
         back: {
@@ -15,7 +15,7 @@ export const templates = {
                 x: 220,
                 y: 260,
                 width: 360,
-                height: 560
+                height: 408
             }
         }
     }

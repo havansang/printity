@@ -160,51 +160,9 @@ export function EditorProvider({ children }) {
 
     /* ── object constraints (stay in printArea) ─────────────────── */
     const _constrainObject = useCallback((obj) => {
-        const canvas = canvasRef.current;
-        let pa = _getPrintArea();
-        if (canvas?.viewportTransform) {
-            const vpt = canvas.viewportTransform;
-            const zoom = Number(vpt[0]) || 1;
-            if (zoom > 0) {
-                pa = {
-                    x: -vpt[4] / zoom,
-                    y: -vpt[5] / zoom,
-                    width: canvas.getWidth() / zoom,
-                    height: canvas.getHeight() / zoom,
-                };
-            }
-        }
-
-        obj.setCoords();
-        const bRect = obj.getBoundingRect();
-
-        let dx = 0;
-        let dy = 0;
-
-        if (bRect.width >= pa.width) {
-            dx = (pa.x + (pa.width - bRect.width) / 2) - bRect.left;
-        } else if (bRect.left < pa.x) {
-            dx = pa.x - bRect.left;
-        } else if (bRect.left + bRect.width > pa.x + pa.width) {
-            dx = (pa.x + pa.width) - (bRect.left + bRect.width);
-        }
-
-        if (bRect.height >= pa.height) {
-            dy = (pa.y + (pa.height - bRect.height) / 2) - bRect.top;
-        } else if (bRect.top < pa.y) {
-            dy = pa.y - bRect.top;
-        } else if (bRect.top + bRect.height > pa.y + pa.height) {
-            dy = (pa.y + pa.height) - (bRect.top + bRect.height);
-        }
-
-        if (dx || dy) {
-            obj.set({
-                left: (obj.left ?? 0) + dx,
-                top: (obj.top ?? 0) + dy,
-            });
-            obj.setCoords();
-        }
-    }, [_getPrintArea]);
+        // Allow free movement outside print area (no hard clamp).
+        if (obj) obj.setCoords();
+    }, []);
 
     /* ── history ─────────────────────────────────────────────────── */
 
