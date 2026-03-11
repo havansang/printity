@@ -1,10 +1,70 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Canvas } from 'fabric';
+import { Canvas, Control, controlsUtils } from 'fabric';
 import { useEditor } from './EditorContext';
 import Positioner from './Positioner';
 
 const CANVAS_W = 360;
-const CANVAS_H = 408;
+const CANVAS_H = 560;
+const CONTROL_GREEN = '#6abf57';
+const CONTROL_BG = '#ffffff';
+
+function renderRotateControl(ctx, left, top, _styleOverride, fabricObject) {
+    const size = Math.max(26, Math.min(84, (fabricObject.cornerSize || 10) * 2.6));
+    const radius = size / 2;
+
+    ctx.save();
+    ctx.translate(left, top);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fillStyle = CONTROL_BG;
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = Math.max(2, radius * 0.5);
+    ctx.shadowOffsetY = 1;
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.lineWidth = Math.max(1, radius * 0.1);
+    ctx.strokeStyle = '#dce4d8';
+    ctx.stroke();
+
+    ctx.fillStyle = CONTROL_GREEN;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(radius * 1.55)}px sans-serif`;
+    ctx.fillText('\u21bb', 0, 1);
+    ctx.restore();
+}
+
+function createRotateControl(offsetY) {
+    return new Control({
+        x: 0,
+        y: -0.5,
+        offsetY,
+        withConnection: false,
+        actionName: 'rotate',
+        actionHandler: controlsUtils.rotationWithSnapping,
+        cursorStyleHandler: controlsUtils.rotationStyleHandler,
+        render: renderRotateControl,
+    });
+}
+
+function createEdgeScaleControl({ x, y, axis, size, touchSize }) {
+    return new Control({
+        x,
+        y,
+        withConnection: false,
+        actionName: axis === 'x' ? 'scaleX' : 'scaleY',
+        actionHandler: axis === 'x' ? controlsUtils.scalingX : controlsUtils.scalingY,
+        cursorStyleHandler: controlsUtils.scaleSkewCursorStyleHandler,
+        sizeX: size,
+        sizeY: size,
+        touchSizeX: touchSize,
+        touchSizeY: touchSize,
+    });
+}
 
 export default function CanvasWorkspace() {
     const sceneRef = useRef(null);
@@ -13,6 +73,7 @@ export default function CanvasWorkspace() {
     const fabricRef = useRef(null);
     const rafRef = useRef(null);
     const loadIdRef = useRef(0);
+    const visualScaleRef = useRef(1);
     const basePrintAreaRef = useRef({ x: 0, y: 0 });
     const pushHistoryRef = useRef(null);
     const syncLayersRef = useRef(null);
@@ -23,6 +84,8 @@ export default function CanvasWorkspace() {
         pushHistory, undo, redo,
         setSelectedObject,
         templateDef,
+        printArea,
+        setSurfacePrintArea,
         shirtColor,
         isPreviewMode,
     } = useEditor();
@@ -58,6 +121,109 @@ export default function CanvasWorkspace() {
         };
     }, [activeSurface]);
 
+    const extractPrintAreaFromSvg = useCallback((svgEl, surface) => {
+        if (!svgEl || !surface) return null;
+
+        const placeholder = svgEl.querySelector(`#placeholder_${surface}`);
+        if (!placeholder) return null;
+
+        const width = Number.parseFloat(placeholder.getAttribute('width') || '')
+            || placeholder.viewBox?.baseVal?.width
+            || 0;
+        const height = Number.parseFloat(placeholder.getAttribute('height') || '')
+            || placeholder.viewBox?.baseVal?.height
+            || 0;
+
+        let x = Number.parseFloat(placeholder.getAttribute('x') || '') || 0;
+        let y = Number.parseFloat(placeholder.getAttribute('y') || '') || 0;
+
+        const parent = placeholder.parentElement;
+        const transform = parent?.getAttribute('transform') || '';
+        const match = transform.match(/translate\(\s*([-\d.+eE]+)(?:[\s,]+([-\d.+eE]+))?\s*\)/);
+        if (match) {
+            x = Number.parseFloat(match[1]) || x;
+            y = Number.parseFloat(match[2] || '0') || y;
+        }
+
+        if (width <= 0 || height <= 0) return null;
+        return { x, y, width, height };
+    }, []);
+
+    const applyInteractiveHandleScale = useCallback((renderScale, targetObj = null) => {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+
+        const safeScale = Number.isFinite(renderScale) && renderScale > 0 ? renderScale : 1;
+        const inverseScale = 1 / safeScale;
+        const baseCornerSize = Math.max(8, Math.min(72, 10 * inverseScale));
+        const baseTouchCornerSize = Math.max(14, Math.min(96, 22 * inverseScale));
+        const edgeSize = Math.max(7, Math.min(40, baseCornerSize * 0.55));
+        const edgeTouchSize = Math.max(12, Math.min(72, baseTouchCornerSize * 0.65));
+        const cornerSize = edgeSize;
+        const touchCornerSize = edgeTouchSize;
+        const padding = 0;
+        const borderScaleFactor = Math.max(1, Math.min(10, 1.6 * inverseScale));
+        const rotateOffset = -Math.max(12, Math.min(96, 22 * inverseScale));
+
+        canvas.targetFindTolerance = Math.max(4, Math.min(48, 8 * inverseScale));
+
+        const applyToObject = (obj) => {
+            if (!obj) return;
+            obj.set({
+                cornerSize,
+                touchCornerSize,
+                padding,
+                borderScaleFactor,
+                borderColor: CONTROL_GREEN,
+                cornerColor: CONTROL_BG,
+                cornerStrokeColor: CONTROL_GREEN,
+                cornerStyle: 'rect',
+                transparentCorners: false,
+                borderDashArray: null,
+                hasControls: true,
+                lockScalingX: false,
+                lockScalingY: false,
+                lockRotation: false,
+            });
+            obj.controls = obj.controls || {};
+            obj.controls.mtr = createRotateControl(rotateOffset);
+            obj.controls.ml = createEdgeScaleControl({
+                x: -0.5, y: 0, axis: 'x', size: edgeSize, touchSize: edgeTouchSize,
+            });
+            obj.controls.mr = createEdgeScaleControl({
+                x: 0.5, y: 0, axis: 'x', size: edgeSize, touchSize: edgeTouchSize,
+            });
+            obj.controls.mt = createEdgeScaleControl({
+                x: 0, y: -0.5, axis: 'y', size: edgeSize, touchSize: edgeTouchSize,
+            });
+            obj.controls.mb = createEdgeScaleControl({
+                x: 0, y: 0.5, axis: 'y', size: edgeSize, touchSize: edgeTouchSize,
+            });
+            obj.setControlsVisibility({
+                tl: true,
+                tr: true,
+                bl: true,
+                br: true,
+                mtr: true,
+                mt: true,
+                mb: true,
+                ml: true,
+                mr: true,
+            });
+            obj.setCoords();
+        };
+
+        if (targetObj) {
+            applyToObject(targetObj);
+            canvas.requestRenderAll();
+            return;
+        }
+
+        canvas.getObjects().forEach(applyToObject);
+        applyToObject(canvas.getActiveObject());
+        canvas.requestRenderAll();
+    }, []);
+
     const alignCanvasToPrintArea = useCallback(() => {
         const canvas = fabricRef.current;
         if (!canvas) return;
@@ -79,11 +245,13 @@ export default function CanvasWorkspace() {
         wrapper.style.transformOrigin = 'top left';
         wrapper.style.transform = `scale(${scale})`;
         wrapper.style.zIndex = '2';
-    }, [measurePrintArea]);
+        visualScaleRef.current = scale;
+        applyInteractiveHandleScale(scale);
+    }, [applyInteractiveHandleScale, measurePrintArea]);
 
     const syncViewportToPrintArea = useCallback(() => {
         const canvas = fabricRef.current;
-        const pa = templateDef?.[activeSurface]?.printArea;
+        const pa = printArea;
         if (!canvas || !pa) return;
 
         const vpt = canvas.viewportTransform?.slice() || [1, 0, 0, 1, 0, 0];
@@ -99,7 +267,7 @@ export default function CanvasWorkspace() {
         canvas.setViewportTransform(vpt);
 
         basePrintAreaRef.current = { x: pa.x || 0, y: pa.y || 0 };
-    }, [activeSurface, templateDef]);
+    }, [printArea]);
 
     const queueAlign = useCallback(() => {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -137,12 +305,15 @@ export default function CanvasWorkspace() {
             currentSvgNode.replaceWith(nextSvg);
             svgRef.current = nextSvg;
 
+            const pa = extractPrintAreaFromSvg(nextSvg, activeSurface);
+            if (pa) setSurfacePrintArea(activeSurface, pa);
+
             setSvgRevision((v) => v + 1);
             queueAlign();
         } catch (error) {
             console.error('Failed to load SVG surface', error);
         }
-    }, [activeSurface, queueAlign, templateDef]);
+    }, [activeSurface, extractPrintAreaFromSvg, queueAlign, setSurfacePrintArea, templateDef]);
 
     useEffect(() => {
         loadSurfaceSvg();
@@ -158,8 +329,8 @@ export default function CanvasWorkspace() {
         if (!el) return;
 
         const canvas = new Canvas(el, {
-            width: CANVAS_W,
-            height: CANVAS_H,
+            width: printArea?.width || CANVAS_W,
+            height: printArea?.height || CANVAS_H,
             backgroundColor: 'rgba(0,0,0,0)',
             selection: true,
         });
@@ -169,6 +340,7 @@ export default function CanvasWorkspace() {
 
         const onSelected = () => {
             const active = canvas.getActiveObject();
+            applyInteractiveHandleScale(visualScaleRef.current, active ?? null);
             if (active?._layerId) setSelectedLayerId(active._layerId);
             setSelectedObject(active ?? null);
         };
@@ -189,6 +361,10 @@ export default function CanvasWorkspace() {
         canvas.on('object:modified', onModified);
         canvas.on('text:changed', onTextChanged);
         canvas.on('text:editing:exited', onTextEditingExited);
+        const onObjectAdded = (e) => {
+            applyInteractiveHandleScale(visualScaleRef.current, e?.target);
+        };
+        canvas.on('object:added', onObjectAdded);
 
         setCanvas(canvas);
         pushHistoryRef.current?.();
@@ -201,6 +377,7 @@ export default function CanvasWorkspace() {
             canvas.off('object:modified', onModified);
             canvas.off('text:changed', onTextChanged);
             canvas.off('text:editing:exited', onTextEditingExited);
+            canvas.off('object:added', onObjectAdded);
             canvas.dispose();
             fabricRef.current = null;
         };
@@ -210,6 +387,20 @@ export default function CanvasWorkspace() {
     useEffect(() => {
         syncViewportToPrintArea();
     }, [syncViewportToPrintArea]);
+
+    useEffect(() => {
+        const canvas = fabricRef.current;
+        if (!canvas || !printArea) return;
+
+        const nextW = Number(printArea.width) || CANVAS_W;
+        const nextH = Number(printArea.height) || CANVAS_H;
+        if (canvas.getWidth() !== nextW || canvas.getHeight() !== nextH) {
+            canvas.setDimensions({ width: nextW, height: nextH });
+        }
+
+        syncViewportToPrintArea();
+        queueAlign();
+    }, [printArea, queueAlign, syncViewportToPrintArea]);
 
     useEffect(() => {
         const canvas = fabricRef.current;

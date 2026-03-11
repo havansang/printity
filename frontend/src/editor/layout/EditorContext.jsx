@@ -8,6 +8,7 @@ const SURFACES = ['front', 'back'];
 const CUSTOM_PROPS = ['_layerId', '_imageName', '_shapeType', '_layerType'];
 const MAX_HISTORY = 50;
 const AUTO_SAVE_DELAY = 1000;
+const DEFAULT_PRINT_AREA = { x: 0, y: 0, width: 360, height: 560 };
 
 const TEMPLATE_KEY = 'tshirt';
 
@@ -51,6 +52,10 @@ export function EditorProvider({ children }) {
     /* ---------- template --------------------------------------------- */
     const templateDef = templates[TEMPLATE_KEY];
     const [shirtColor, setShirtColor] = useState('#FFFFFF');
+    const [surfacePrintAreas, setSurfacePrintAreas] = useState({
+        front: DEFAULT_PRINT_AREA,
+        back: DEFAULT_PRINT_AREA,
+    });
 
     /* ---------- history ---------------------------------------------- */
     const historyRef = useRef({
@@ -95,8 +100,40 @@ export function EditorProvider({ children }) {
 
     const _getPrintArea = useCallback(() => {
         const surface = activeSurface;
-        return templateDef[surface]?.printArea ?? { x: 0, y: 0, width: 500, height: 600 };
-    }, [activeSurface, templateDef]);
+        return surfacePrintAreas[surface] ?? DEFAULT_PRINT_AREA;
+    }, [activeSurface, surfacePrintAreas]);
+
+    const _getObjectUnitScale = useCallback(() => {
+        const pa = _getPrintArea();
+        const w = Number(pa?.width) || DEFAULT_PRINT_AREA.width;
+        const h = Number(pa?.height) || DEFAULT_PRINT_AREA.height;
+        const scaleW = w / DEFAULT_PRINT_AREA.width;
+        const scaleH = h / DEFAULT_PRINT_AREA.height;
+        return Math.min(8, Math.max(0.5, (scaleW + scaleH) / 2));
+    }, [_getPrintArea]);
+
+    const setSurfacePrintArea = useCallback((surface, area) => {
+        if (!surface || !area) return;
+        const nextArea = {
+            x: Number(area.x) || 0,
+            y: Number(area.y) || 0,
+            width: Number(area.width) || DEFAULT_PRINT_AREA.width,
+            height: Number(area.height) || DEFAULT_PRINT_AREA.height,
+        };
+        if (nextArea.width <= 0 || nextArea.height <= 0) return;
+
+        setSurfacePrintAreas((prev) => {
+            const current = prev[surface] || DEFAULT_PRINT_AREA;
+            if (
+                Math.abs(current.x - nextArea.x) < 0.001 &&
+                Math.abs(current.y - nextArea.y) < 0.001 &&
+                Math.abs(current.width - nextArea.width) < 0.001 &&
+                Math.abs(current.height - nextArea.height) < 0.001
+            ) return prev;
+
+            return { ...prev, [surface]: nextArea };
+        });
+    }, []);
 
     const _refreshUndoRedo = useCallback(() => {
         const h = historyRef.current[activeSurface];
@@ -308,10 +345,13 @@ export function EditorProvider({ children }) {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const pa = _getPrintArea();
+        const unitScale = _getObjectUnitScale();
+        const baseOffset = 20 * unitScale;
+        const randomOffset = 60 * unitScale;
         const text = new IText('Your text here', {
-            left: pa.x + 20 + Math.random() * 60,
-            top: pa.y + 20 + Math.random() * 60,
-            fontSize: 32,
+            left: pa.x + baseOffset + Math.random() * randomOffset,
+            top: pa.y + baseOffset + Math.random() * randomOffset,
+            fontSize: Math.round(32 * unitScale),
             fontFamily: fontFamily || 'Inter, sans-serif',
             fill: '#222222',
         });
@@ -321,7 +361,7 @@ export function EditorProvider({ children }) {
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
-    }, [syncLayers, pushHistory, _getPrintArea]);
+    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const addImage = useCallback((file) => {
         const canvas = canvasRef.current;
@@ -339,16 +379,27 @@ export function EditorProvider({ children }) {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const pa = _getPrintArea();
+        const unitScale = _getObjectUnitScale();
         const imgEl = new Image();
         imgEl.onload = async () => {
-            const fabricImg = new FabricImage(imgEl, { left: pa.x + 20, top: pa.y + 20 });
+            const fabricImg = new FabricImage(imgEl, {
+                left: pa.x + 20 * unitScale,
+                top: pa.y + 20 * unitScale,
+            });
             fabricImg._imageName = name;
             fabricImg._layerType = 'image';
+            const sourceW = fabricImg.width || 1;
+            const sourceH = fabricImg.height || 1;
+            const preferredW = pa.width * 0.35;
+            const preferredH = pa.height * 0.35;
             const maxW = pa.width * 0.85;
             const maxH = pa.height * 0.85;
-            if (fabricImg.width > maxW || fabricImg.height > maxH) {
-                const scale = Math.min(maxW / fabricImg.width, maxH / fabricImg.height);
-                fabricImg.scaleX = scale; fabricImg.scaleY = scale;
+            const preferredScale = Math.min(preferredW / sourceW, preferredH / sourceH);
+            const maxScale = Math.min(maxW / sourceW, maxH / sourceH);
+            const nextScale = Math.min(maxScale, Math.max(preferredScale, 0.05));
+            if (Number.isFinite(nextScale) && nextScale > 0) {
+                fabricImg.scaleX = nextScale;
+                fabricImg.scaleY = nextScale;
             }
             canvas.add(fabricImg);
             canvas.setActiveObject(fabricImg);
@@ -357,7 +408,7 @@ export function EditorProvider({ children }) {
             pushHistory();
         };
         imgEl.src = dataUrl;
-    }, [syncLayers, pushHistory, _getPrintArea]);
+    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const addImageFromDataUrl = useCallback((dataUrl, name) => {
         _placeImageOnCanvas(dataUrl, name);
@@ -367,20 +418,26 @@ export function EditorProvider({ children }) {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const pa = _getPrintArea();
+        const unitScale = _getObjectUnitScale();
+        const largeSize = 100 * unitScale;
+        const mediumSize = 90 * unitScale;
+        const cornerRadius = Math.max(2, 6 * unitScale);
         const baseOpts = {
-            left: pa.x + 40 + Math.random() * 80,
-            top: pa.y + 40 + Math.random() * 80,
+            left: pa.x + 40 * unitScale + Math.random() * 80 * unitScale,
+            top: pa.y + 40 * unitScale + Math.random() * 80 * unitScale,
             fill: '#4169E1', stroke: null, strokeWidth: 0,
         };
         let shape;
         switch (shapeType) {
-            case 'Circle': shape = new Circle({ ...baseOpts, radius: 50 }); break;
-            case 'Square': shape = new Rect({ ...baseOpts, width: 100, height: 100, rx: 6, ry: 6 }); break;
-            case 'Triangle': shape = new Triangle({ ...baseOpts, width: 100, height: 90 }); break;
+            case 'Circle': shape = new Circle({ ...baseOpts, radius: (largeSize / 2) }); break;
+            case 'Square': shape = new Rect({
+                ...baseOpts, width: largeSize, height: largeSize, rx: cornerRadius, ry: cornerRadius,
+            }); break;
+            case 'Triangle': shape = new Triangle({ ...baseOpts, width: largeSize, height: mediumSize }); break;
             case 'Star': {
                 const pts = [];
                 for (let i = 0; i < 10; i++) {
-                    const r = i % 2 === 0 ? 50 : 22;
+                    const r = i % 2 === 0 ? (50 * unitScale) : (22 * unitScale);
                     const a = (Math.PI / 5) * i - Math.PI / 2;
                     pts.push({ x: r * Math.cos(a), y: r * Math.sin(a) });
                 }
@@ -392,10 +449,12 @@ export function EditorProvider({ children }) {
                     const r = (t * Math.PI) / 180;
                     pts.push({ x: 16 * Math.pow(Math.sin(r), 3), y: -(13 * Math.cos(r) - 5 * Math.cos(2 * r) - 2 * Math.cos(3 * r) - Math.cos(4 * r)) });
                 }
-                shape = new Polygon(pts, { ...baseOpts, scaleX: 3, scaleY: 3 }); break;
+                shape = new Polygon(pts, { ...baseOpts, scaleX: 3 * unitScale, scaleY: 3 * unitScale }); break;
             }
-            case 'Underline': shape = new Rect({ ...baseOpts, width: 160, height: 8, rx: 4, ry: 4 }); break;
-            default: shape = new Rect({ ...baseOpts, width: 100, height: 100 });
+            case 'Underline': shape = new Rect({
+                ...baseOpts, width: 160 * unitScale, height: 8 * unitScale, rx: 4 * unitScale, ry: 4 * unitScale,
+            }); break;
+            default: shape = new Rect({ ...baseOpts, width: largeSize, height: largeSize });
         }
         shape._shapeType = shapeType;
         shape._layerType = 'shape';
@@ -404,7 +463,7 @@ export function EditorProvider({ children }) {
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
-    }, [syncLayers, pushHistory, _getPrintArea]);
+    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     /* ── delete / duplicate ──────────────────────────────────────── */
 
@@ -545,7 +604,9 @@ export function EditorProvider({ children }) {
         selectedObjectType,
         uploadedImages,
         shirtColor, setShirtColor,
-        templateDef, activeSurface,
+        templateDef,
+        printArea: _getPrintArea(),
+        setSurfacePrintArea,
         isPreviewMode, setIsPreviewMode,
         isPanMode, togglePanMode,
         zoomLevel, zoomIn, zoomOut, applyZoom,
