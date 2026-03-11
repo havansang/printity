@@ -88,6 +88,7 @@ export default function CanvasWorkspace() {
         setSurfacePrintArea,
         shirtColor,
         isPreviewMode,
+        zoomLevel,
     } = useEditor();
 
     const [svgRevision, setSvgRevision] = useState(0);
@@ -113,13 +114,16 @@ export default function CanvasWorkspace() {
 
         if (printRect.width <= 0 || printRect.height <= 0) return null;
 
+        // `Positioner` scales the whole scene, so convert back to scene-local units.
+        const sceneZoom = Math.max(0.0001, Number(zoomLevel) || 1);
+
         return {
-            left: printRect.left - sceneRect.left,
-            top: printRect.top - sceneRect.top,
-            width: printRect.width,
-            height: printRect.height,
+            left: (printRect.left - sceneRect.left) / sceneZoom,
+            top: (printRect.top - sceneRect.top) / sceneZoom,
+            width: printRect.width / sceneZoom,
+            height: printRect.height / sceneZoom,
         };
-    }, [activeSurface]);
+    }, [activeSurface, zoomLevel]);
 
     const extractPrintAreaFromSvg = useCallback((svgEl, surface) => {
         if (!svgEl || !surface) return null;

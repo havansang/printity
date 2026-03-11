@@ -150,10 +150,16 @@ export function EditorProvider({ children }) {
         const objects = canvas.getObjects();
         const nextLayers = objects.map((obj) => {
             if (!obj._layerId) obj._layerId = _nextId++;
-            let name = 'Object', type = 'shape';
-            if (obj instanceof IText) { name = obj.text?.slice(0, 20) || 'Text'; type = 'text'; }
-            else if (obj instanceof FabricImage) { name = obj._imageName || 'Image'; type = 'image'; }
-            else if (obj._shapeType) { name = obj._shapeType; type = 'shape'; }
+            const rawType = String(obj?.type || '').toLowerCase();
+            let type = obj?._layerType || 'shape';
+            if (obj instanceof IText || rawType === 'i-text' || rawType === 'textbox') type = 'text';
+            else if (obj instanceof FabricImage || rawType === 'image') type = 'image';
+
+            let name = 'Object';
+            if (type === 'text') name = (obj?.text || '').toString().slice(0, 20) || 'Text';
+            else if (type === 'image') name = obj?._imageName || 'Image';
+            else if (obj?._shapeType) name = obj._shapeType;
+            else if (rawType) name = rawType[0].toUpperCase() + rawType.slice(1);
             return { id: obj._layerId, name, type };
         });
         setLayers(nextLayers);
@@ -407,11 +413,7 @@ export function EditorProvider({ children }) {
             }
             canvas.add(fabricImg);
             canvas.setActiveObject(fabricImg);
-            canvas.viewportCenterObject(fabricImg)
             canvas.requestRenderAll();
-
-            console.log("viewportTransform:", canvas.viewportTransform);
-            console.log("image position:", fabricImg.left, fabricImg.top);
             syncLayers();
             pushHistory();
         };
