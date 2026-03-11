@@ -576,12 +576,11 @@
 /*  CANVAS WORKSPACE                                                    */
 /* =================================================================== */
 
-.cw-root {
+.editor {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  min-width: 0;
   background: #eaebf0;
   background-image: radial-gradient(circle, #d8d9e0 1px, transparent 1px);
   background-size: 20px 20px;
@@ -590,98 +589,61 @@
   transition: background var(--t);
 }
 
-.cw-root.preview {
+.editor.preview {
   background: #f8f8fc;
   background-image: none;
 }
 
-.cw-stage {
-  flex: 1;
+.editor .toolbar {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+  padding: 10px 16px;
 }
 
-/* Shirt wrapper */
-.shirt-wrapper {
+.viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px 12px 16px;
+}
+
+.positioner {
+  position: relative;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.scene {
   position: relative;
   width: 540px;
   height: 810px;
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.15));
+  user-select: none;
 }
 
-.shirt-svg-wrap {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.shirt-svg-obj {
+.mockup-svg,
+.scene>svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-}
-
-.shirt-color-overlay {
-  position: absolute;
-  inset: 0;
-  mix-blend-mode: multiply;
+  display: block;
   pointer-events: none;
-  border-radius: 4px;
-  transition: background 0.3s ease, opacity 0.3s ease;
+  z-index: 1;
 }
 
-/* Print area */
-.print-area {
-  position: absolute;
-  left: 90px;
-  top: 208px;
-  width: 360px;
-  height: 560px;
-  border: 2px dashed rgba(92, 107, 255, 0.45);
-  border-radius: 3px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.82);
-  transition: border-color 0.2s;
+.scene .canvas-container {
+  position: absolute !important;
 }
 
-.print-area:hover {
-  border-color: rgba(92, 107, 255, 0.75);
-}
-
-.preview .print-area {
-  border-color: transparent;
-  background: transparent;
-}
-
-.print-area-badge {
-  position: absolute;
-  top: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 2.5px;
-  color: rgba(92, 107, 255, 0.4);
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.print-area .canvas-container {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Bottom bar */
-.cw-bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 16px;
-  position: relative;
-  width: 100%;
+.scene .canvas-container canvas {
+  background: #ffffff;
 }
 
 .surface-tabs {

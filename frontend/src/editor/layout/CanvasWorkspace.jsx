@@ -1,12 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from 'fabric';
 import { useEditor } from './EditorContext';
+import Positioner from './Positioner';
 
 const CANVAS_W = 360;
 const CANVAS_H = 560;
 
 export default function CanvasWorkspace() {
+    const sceneRef = useRef(null);
+    const svgRef = useRef(null);
     const canvasElRef = useRef(null);
+    const fabricRef = useRef(null);
+    const rafRef = useRef(null);
+    const loadIdRef = useRef(0);
+    const basePrintAreaRef = useRef({ x: 0, y: 0 });
+
     const {
         setCanvas, syncLayers, setSelectedLayerId,
         activeSurface, surfaces, switchSurface,
@@ -17,12 +25,121 @@ export default function CanvasWorkspace() {
         isPreviewMode,
     } = useEditor();
 
-    const [svgKey, setSvgKey] = useState(activeSurface);
+    const [svgRevision, setSvgRevision] = useState(0);
 
-    /* update SVG when surface changes */
-    useEffect(() => { setSvgKey(activeSurface); }, [activeSurface]);
+    const measurePrintArea = useCallback(() => {
+        const sceneEl = sceneRef.current;
+        const svgEl = svgRef.current;
+        if (!sceneEl || !svgEl) return null;
 
-    const svgSrc = templateDef?.[activeSurface]?.svg;
+        const placeholder = svgEl.querySelector(`#placeholder_${activeSurface}`);
+        if (!placeholder) return null;
+
+        const sceneRect = sceneEl.getBoundingClientRect();
+        const printRect = placeholder.getBoundingClientRect();
+
+        if (printRect.width <= 0 || printRect.height <= 0) return null;
+
+        return {
+            left: printRect.left - sceneRect.left,
+            top: printRect.top - sceneRect.top,
+            width: printRect.width,
+            height: printRect.height,
+        };
+    }, [activeSurface]);
+
+    const alignCanvasToPrintArea = useCallback(() => {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+
+        const pa = measurePrintArea();
+        if (!pa) return;
+
+        const wrapper = canvas.wrapperEl;
+        const scaleX = pa.width / CANVAS_W;
+        const scaleY = pa.height / CANVAS_H;
+
+        wrapper.style.position = 'absolute';
+        wrapper.style.left = `${pa.left}px`;
+        wrapper.style.top = `${pa.top}px`;
+        wrapper.style.transformOrigin = 'top left';
+        wrapper.style.transform = `scale(${scaleX}, ${scaleY})`;
+        wrapper.style.zIndex = '2';
+    }, [measurePrintArea]);
+
+    const syncViewportToPrintArea = useCallback(() => {
+        const canvas = fabricRef.current;
+        const pa = templateDef?.[activeSurface]?.printArea;
+        if (!canvas || !pa) return;
+
+        const vpt = canvas.viewportTransform?.slice() || [1, 0, 0, 1, 0, 0];
+        const zoom = Number(vpt[0]) || 1;
+
+        const prevBaseTx = -basePrintAreaRef.current.x * zoom;
+        const prevBaseTy = -basePrintAreaRef.current.y * zoom;
+        const panX = vpt[4] - prevBaseTx;
+        const panY = vpt[5] - prevBaseTy;
+
+        vpt[4] = -(pa.x || 0) * zoom + panX;
+        vpt[5] = -(pa.y || 0) * zoom + panY;
+        canvas.setViewportTransform(vpt);
+
+        basePrintAreaRef.current = { x: pa.x || 0, y: pa.y || 0 };
+    }, [activeSurface, templateDef]);
+
+    const queueAlign = useCallback(() => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null;
+            alignCanvasToPrintArea();
+        });
+    }, [alignCanvasToPrintArea]);
+
+    const applyShirtColor = useCallback(() => {
+        const svgEl = svgRef.current;
+        if (!svgEl) return;
+        const colorLayer = svgEl.querySelector('#color_first');
+        if (colorLayer) colorLayer.setAttribute('fill', shirtColor || '#FFFFFF');
+    }, [shirtColor]);
+
+    const loadSurfaceSvg = useCallback(async () => {
+        const source = templateDef?.[activeSurface]?.svg;
+        const currentSvgNode = svgRef.current;
+        if (!source || !currentSvgNode) return;
+
+        const loadId = ++loadIdRef.current;
+
+        try {
+            const res = await fetch(source);
+            const text = await res.text();
+            if (loadId !== loadIdRef.current) return;
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'image/svg+xml');
+            const nextSvg = doc.querySelector('svg');
+            if (!nextSvg) return;
+
+            nextSvg.classList.add('mockup-svg');
+            currentSvgNode.replaceWith(nextSvg);
+            svgRef.current = nextSvg;
+
+            // FIX: remove white fill but keep border
+
+
+            setSvgRevision((v) => v + 1);
+            queueAlign();
+        } catch (error) {
+            console.error('Failed to load SVG surface', error);
+        }
+    }, [activeSurface, queueAlign, templateDef]);
+
+    useEffect(() => {
+        loadSurfaceSvg();
+    }, [loadSurfaceSvg]);
+
+    useEffect(() => {
+        applyShirtColor();
+    }, [applyShirtColor, svgRevision]);
 
     /* ── mount Fabric canvas ─────────────────────────────────── */
     useEffect(() => {
@@ -32,9 +149,12 @@ export default function CanvasWorkspace() {
         const canvas = new Canvas(el, {
             width: CANVAS_W,
             height: CANVAS_H,
-            backgroundColor: '#ffffff',
+            backgroundColor: 'transparent',
             selection: true,
         });
+        fabricRef.current = canvas;
+
+        syncViewportToPrintArea();
 
         const onSelected = () => {
             const active = canvas.getActiveObject();
@@ -53,6 +173,7 @@ export default function CanvasWorkspace() {
 
         setCanvas(canvas);
         pushHistory();
+        queueAlign();
 
         return () => {
             canvas.off('selection:created', onSelected);
@@ -61,9 +182,37 @@ export default function CanvasWorkspace() {
             canvas.off('object:modified', onModified);
             canvas.off('text:changed', onTextChanged);
             canvas.dispose();
+            fabricRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        syncViewportToPrintArea();
+    }, [syncViewportToPrintArea]);
+
+    /* ── print-area measurement + observer ───────────────────── */
+    useEffect(() => {
+        queueAlign();
+    }, [activeSurface, svgRevision, queueAlign]);
+
+    useEffect(() => {
+        const sceneEl = sceneRef.current;
+        const svgEl = svgRef.current;
+        if (!sceneEl || !svgEl) return;
+
+        const observer = new ResizeObserver(() => {
+            queueAlign();
+        });
+
+        observer.observe(sceneEl);
+        observer.observe(svgEl);
+
+        const placeholder = svgEl.querySelector(`#placeholder_${activeSurface}`);
+        if (placeholder) observer.observe(placeholder);
+
+        return () => observer.disconnect();
+    }, [activeSurface, svgRevision, queueAlign]);
 
     /* ── keyboard shortcuts ──────────────────────────────────── */
     useEffect(() => {
@@ -80,44 +229,15 @@ export default function CanvasWorkspace() {
         return () => window.removeEventListener('keydown', onKey);
     }, [undo, redo]);
 
+    useEffect(() => {
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, []);
+
     return (
-        <div className={`cw-root${isPreviewMode ? ' preview' : ''}`} id="canvas-workspace">
-            {/* T-shirt SVG template */}
-            <div className="cw-stage">
-                <div className="shirt-wrapper">
-                    {/* Colorized shirt */}
-                    {svgSrc && (
-                        <div
-                            className="shirt-svg-wrap"
-                            key={svgKey}
-                            style={{ '--shirt-color': shirtColor }}
-                        >
-                            <object
-                                data={svgSrc}
-                                type="image/svg+xml"
-                                className="shirt-svg-obj"
-                                aria-label="T-shirt template"
-                            />
-                            {/* Color overlay */}
-                            <div
-                                className="shirt-color-overlay"
-                                style={{ background: shirtColor, opacity: shirtColor === '#FFFFFF' ? 0.12 : 0.45 }}
-                            />
-                        </div>
-                    )}
-
-                    {/* Print area (Fabric canvas) */}
-                    <div className="print-area" id="print-area">
-                        {!isPreviewMode && (
-                            <span className="print-area-badge">PRINT AREA</span>
-                        )}
-                        <canvas ref={canvasElRef} />
-                    </div>
-                </div>
-            </div>
-
-            {/* Surface switcher */}
-            <div className="cw-bottom-bar">
+        <div className={`editor${isPreviewMode ? ' preview' : ''}`} id="canvas-workspace">
+            <div className="toolbar">
                 <div className="surface-tabs" id="surface-tabs">
                     {surfaces.map((s) => (
                         <button
@@ -131,6 +251,13 @@ export default function CanvasWorkspace() {
                     ))}
                 </div>
             </div>
+
+            <Positioner>
+                <div ref={sceneRef} className="scene">
+                    <svg ref={svgRef} className="mockup-svg" aria-label="T-shirt template" />
+                    <canvas ref={canvasElRef} />
+                </div>
+            </Positioner>
         </div>
     );
 }

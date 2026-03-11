@@ -1,7 +1,7 @@
 export const templates = {
     tshirt: {
         front: {
-            svg: "/templates/T_Shirt_front.svg",
+            svg: "front.svg",
             printArea: {
                 x: 220,
                 y: 260,
@@ -10,7 +10,7 @@ export const templates = {
             }
         },
         back: {
-            svg: "/templates/T_Shirt_back.svg",
+            svg: "back.svg",
             printArea: {
                 x: 220,
                 y: 260,
