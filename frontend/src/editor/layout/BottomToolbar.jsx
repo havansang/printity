@@ -1,29 +1,38 @@
 import { useEditor } from './EditorContext';
 
-const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
+const ZOOM_STEP = 1.1;
 
 export default function BottomToolbar() {
-    const { zoomLevel, zoomIn, zoomOut, applyZoom, isPanMode, togglePanMode } = useEditor();
-
+    const { zoomLevel, zoomMin, zoomMax, applyZoom, isPanMode, togglePanMode } = useEditor();
     const pct = Math.round(zoomLevel * 100);
 
     const handleStepClick = (dir) => {
-        const idx = ZOOM_STEPS.findIndex((z) => z >= zoomLevel);
-        if (dir === 'in') applyZoom(ZOOM_STEPS[Math.min(idx + 1, ZOOM_STEPS.length - 1)]);
-        if (dir === 'out') applyZoom(ZOOM_STEPS[Math.max(idx - 1, 0)]);
+        const next = dir === 'in' ? zoomLevel * ZOOM_STEP : zoomLevel / ZOOM_STEP;
+        applyZoom(next);
     };
 
     return (
         <footer className="bottom-toolbar" id="bottom-toolbar">
-            {/* Left group – zoom + hand */}
             <div className="bt-group bt-left">
-                <button className="bt-btn" id="bt-zoom-out" onClick={() => handleStepClick('out')} disabled={zoomLevel <= 0.5} title="Zoom Out">
+                <button
+                    className="bt-btn"
+                    id="bt-zoom-out"
+                    onClick={() => handleStepClick('out')}
+                    disabled={zoomLevel <= zoomMin}
+                    title="Zoom Out"
+                >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </button>
 
                 <span className="bt-zoom-pct" id="bt-zoom-pct">{pct}%</span>
 
-                <button className="bt-btn" id="bt-zoom-in" onClick={() => handleStepClick('in')} disabled={zoomLevel >= 3} title="Zoom In">
+                <button
+                    className="bt-btn"
+                    id="bt-zoom-in"
+                    onClick={() => handleStepClick('in')}
+                    disabled={zoomLevel >= zoomMax}
+                    title="Zoom In"
+                >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </button>
 
@@ -43,7 +52,6 @@ export default function BottomToolbar() {
                 </button>
             </div>
 
-            {/* Right – Save */}
             <div className="bt-group bt-right">
                 <button className="bt-save-btn" id="bt-save">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>

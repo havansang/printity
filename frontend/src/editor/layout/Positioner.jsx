@@ -1,100 +1,77 @@
-import { useRef,useState,useEffect } from "react"
+import { useEffect, useRef, useState } from 'react';
+import { useEditor } from './EditorContext';
 
-export default function Positioner({children}){
+const WHEEL_ZOOM_STEP = 1.1;
 
-  const ref = useRef(null)
+export default function Positioner({ children }) {
+    const { zoomLevel, applyZoom } = useEditor();
+    const [pos, setPos] = useState({ x: 0, y: 0 });
 
-  const [zoom,setZoom] = useState(1)
-  const [pos,setPos] = useState({x:0,y:0})
+    const spacePressedRef = useRef(false);
+    const draggingRef = useRef(false);
+    const startRef = useRef({ x: 0, y: 0 });
 
-  const spacePressed = useRef(false)
+    useEffect(() => {
+        const down = (e) => {
+            if (e.code === 'Space') spacePressedRef.current = true;
+        };
+        const up = (e) => {
+            if (e.code === 'Space') spacePressedRef.current = false;
+        };
 
-  useEffect(()=>{
+        window.addEventListener('keydown', down);
+        window.addEventListener('keyup', up);
 
-    function down(e){
-      if(e.code==="Space") spacePressed.current=true
-    }
+        return () => {
+            window.removeEventListener('keydown', down);
+            window.removeEventListener('keyup', up);
+        };
+    }, []);
 
-    function up(e){
-      if(e.code==="Space") spacePressed.current=false
-    }
+    const wheel = (e) => {
+        e.preventDefault();
+        const next = e.deltaY > 0 ? zoomLevel / WHEEL_ZOOM_STEP : zoomLevel * WHEEL_ZOOM_STEP;
+        applyZoom(next);
+    };
 
-    window.addEventListener("keydown",down)
-    window.addEventListener("keyup",up)
+    const mouseDown = (e) => {
+        if (!spacePressedRef.current) return;
+        draggingRef.current = true;
+        startRef.current = {
+            x: e.clientX - pos.x,
+            y: e.clientY - pos.y,
+        };
+    };
 
-    return ()=>{
-      window.removeEventListener("keydown",down)
-      window.removeEventListener("keyup",up)
-    }
+    const mouseMove = (e) => {
+        if (!draggingRef.current) return;
+        setPos({
+            x: e.clientX - startRef.current.x,
+            y: e.clientY - startRef.current.y,
+        });
+    };
 
-  },[])
+    const mouseUp = () => {
+        draggingRef.current = false;
+    };
 
-
-  function wheel(e){
-
-    let z = zoom * (e.deltaY>0?0.9:1.1)
-  
-    setZoom(z)
-  
-  }
-
-  let dragging=false
-  let start={x:0,y:0}
-
-  function mouseDown(e){
-
-    if(!spacePressed.current) return
-
-    dragging=true
-
-    start={
-      x:e.clientX-pos.x,
-      y:e.clientY-pos.y
-    }
-
-  }
-
-  function mouseMove(e){
-
-    if(!dragging) return
-
-    setPos({
-      x:e.clientX-start.x,
-      y:e.clientY-start.y
-    })
-
-  }
-
-  function mouseUp(){
-    dragging=false
-  }
-
-
-  return(
-
-    <div
-      ref={ref}
-      className="viewport"
-      onWheel={wheel}
-      onMouseDown={mouseDown}
-      onMouseMove={mouseMove}
-      onMouseUp={mouseUp}
-      onMouseLeave={mouseUp}
-    >
-
-      <div
-        className="positioner"
-        style={{
-          transform:`translate(${pos.x}px,${pos.y}px) scale(${zoom})`
-        }}
-      >
-
-        {children}
-
-      </div>
-
-    </div>
-
-  )
-
+    return (
+        <div
+            className="viewport"
+            onWheel={wheel}
+            onMouseDown={mouseDown}
+            onMouseMove={mouseMove}
+            onMouseUp={mouseUp}
+            onMouseLeave={mouseUp}
+        >
+            <div
+                className="positioner"
+                style={{
+                    transform: `translate(${pos.x}px,${pos.y}px) scale(${zoomLevel})`,
+                }}
+            >
+                {children}
+            </div>
+        </div>
+    );
 }

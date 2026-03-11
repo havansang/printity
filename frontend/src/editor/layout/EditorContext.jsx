@@ -9,6 +9,9 @@ const CUSTOM_PROPS = ['_layerId', '_imageName', '_shapeType', '_layerType'];
 const MAX_HISTORY = 50;
 const AUTO_SAVE_DELAY = 1000;
 const DEFAULT_PRINT_AREA = { x: 0, y: 0, width: 360, height: 560 };
+const SCENE_ZOOM_MIN = 0.03;
+const SCENE_ZOOM_MAX = 4;
+const SCENE_ZOOM_STEP = 1.1;
 
 const TEMPLATE_KEY = 'tshirt';
 
@@ -303,15 +306,14 @@ export function EditorProvider({ children }) {
 
     /* ── zoom ────────────────────────────────────────────────────── */
     const applyZoom = useCallback((factor) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const newZoom = Math.min(3, Math.max(0.5, factor));
-        canvas.setZoom(newZoom);
-        setZoomLevel(newZoom);
+        const next = Number(factor);
+        if (!Number.isFinite(next)) return;
+        const clamped = Math.min(SCENE_ZOOM_MAX, Math.max(SCENE_ZOOM_MIN, next));
+        setZoomLevel(clamped);
     }, []);
 
-    const zoomIn = useCallback(() => applyZoom(Math.min(3, Math.round((zoomLevel + 0.25) * 4) / 4)), [applyZoom, zoomLevel]);
-    const zoomOut = useCallback(() => applyZoom(Math.max(0.5, Math.round((zoomLevel - 0.25) * 4) / 4)), [applyZoom, zoomLevel]);
+    const zoomIn = useCallback(() => applyZoom(zoomLevel * SCENE_ZOOM_STEP), [applyZoom, zoomLevel]);
+    const zoomOut = useCallback(() => applyZoom(zoomLevel / SCENE_ZOOM_STEP), [applyZoom, zoomLevel]);
 
     /* ── alignment (relative to printArea) ──────────────────────── */
     const alignObject = useCallback((alignment) => {
@@ -378,11 +380,13 @@ export function EditorProvider({ children }) {
     const _placeImageOnCanvas = useCallback((dataUrl, name) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const pa = _getPrintArea();
-        const unitScale = _getObjectUnitScale();
         const imgEl = new Image();
         imgEl.onload = async () => {
+            const pa = _getPrintArea();
+            const unitScale = _getObjectUnitScale();
             const fabricImg = new FabricImage(imgEl, {
+                originX: 'left',
+                originY: 'top',
                 left: pa.x + 20 * unitScale,
                 top: pa.y + 20 * unitScale,
             });
@@ -390,20 +394,24 @@ export function EditorProvider({ children }) {
             fabricImg._layerType = 'image';
             const sourceW = fabricImg.width || 1;
             const sourceH = fabricImg.height || 1;
-            const preferredW = pa.width * 0.35;
-            const preferredH = pa.height * 0.35;
+            const preferredW = pa.width * 0.6;
+            const preferredH = pa.height * 0.6;
             const maxW = pa.width * 0.85;
             const maxH = pa.height * 0.85;
             const preferredScale = Math.min(preferredW / sourceW, preferredH / sourceH);
             const maxScale = Math.min(maxW / sourceW, maxH / sourceH);
-            const nextScale = Math.min(maxScale, Math.max(preferredScale, 0.05));
+            const nextScale = Math.min(maxScale, Math.max(preferredScale * 2, 0.05));
             if (Number.isFinite(nextScale) && nextScale > 0) {
                 fabricImg.scaleX = nextScale;
                 fabricImg.scaleY = nextScale;
             }
             canvas.add(fabricImg);
             canvas.setActiveObject(fabricImg);
+            canvas.viewportCenterObject(fabricImg)
             canvas.requestRenderAll();
+
+            console.log("viewportTransform:", canvas.viewportTransform);
+            console.log("image position:", fabricImg.left, fabricImg.top);
             syncLayers();
             pushHistory();
         };
@@ -609,6 +617,8 @@ export function EditorProvider({ children }) {
         setSurfacePrintArea,
         isPreviewMode, setIsPreviewMode,
         isPanMode, togglePanMode,
+        zoomMin: SCENE_ZOOM_MIN,
+        zoomMax: SCENE_ZOOM_MAX,
         zoomLevel, zoomIn, zoomOut, applyZoom,
     };
 
