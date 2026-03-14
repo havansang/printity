@@ -14,9 +14,15 @@ const SCENE_ZOOM_MAX = 4;
 const SCENE_ZOOM_STEP = 1.1;
 
 const TEMPLATE_KEY = 'tshirt';
+const PRODUCT_DRAFT_STORAGE_KEY = 'printity.productDraft';
 
 const EditorContext = createContext(null);
 let _nextId = 1;
+
+function cloneSerializable(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+}
 
 /* ── Color palette from spec ──────────────────────────────── */
 export const SHIRT_COLORS = [
@@ -234,6 +240,80 @@ export function EditorProvider({ children }) {
         }, AUTO_SAVE_DELAY);
     }, []);
 
+    const captureSurfaceSnapshots = useCallback(() => {
+        const canvas = canvasRef.current;
+        const surface = activeSurfaceRef.current;
+        const canReadCanvas = Boolean(canvas && !canvas.disposed && !canvas.destroyed);
+
+        if (autoSaveTimer.current) {
+            clearTimeout(autoSaveTimer.current);
+            autoSaveTimer.current = null;
+        }
+
+        if (canReadCanvas) {
+            surfaceDataRef.current[surface] = canvas.toJSON(CUSTOM_PROPS);
+        }
+
+        return {
+            front: cloneSerializable(surfaceDataRef.current.front),
+            back: cloneSerializable(surfaceDataRef.current.back),
+        };
+    }, []);
+
+    const restoreCurrentSurface = useCallback(async (canvas) => {
+        const targetCanvas = canvas || canvasRef.current;
+        const snapshot = surfaceDataRef.current[activeSurfaceRef.current];
+        if (!targetCanvas || !snapshot) return false;
+
+        _isRestoringHistory.current = true;
+        await targetCanvas.loadFromJSON(cloneSerializable(snapshot));
+        targetCanvas.requestRenderAll();
+        _isRestoringHistory.current = false;
+        syncLayers();
+        _refreshUndoRedo();
+        return true;
+    }, [_refreshUndoRedo, syncLayers]);
+
+    const saveProduct = useCallback(() => {
+        const payload = {
+            templateKey: TEMPLATE_KEY,
+            savedAt: new Date().toISOString(),
+            shirtColor,
+            activeSurface: activeSurfaceRef.current,
+            printAreas: cloneSerializable(surfacePrintAreas),
+            surfaces: captureSurfaceSnapshots(),
+        };
+
+        try {
+            window.localStorage.setItem(PRODUCT_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+            return { ok: true, storageKey: PRODUCT_DRAFT_STORAGE_KEY, payload };
+        } catch (error) {
+            console.error('Failed to save product draft', error);
+            return { ok: false, error, payload };
+        }
+    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas]);
+
+    const enterPreviewMode = useCallback(() => {
+        captureSurfaceSnapshots();
+        setSelectedLayerId(null);
+        setSelectedObjectType(null);
+        selectedObjectRef.current = null;
+        setTextStyle({
+            fontSize: 28,
+            fontFamily: 'Inter, sans-serif',
+            fill: '#222222',
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textAlign: 'left',
+            isText: false,
+        });
+        setIsPreviewMode(true);
+    }, [captureSurfaceSnapshots]);
+
+    const exitPreviewMode = useCallback(() => {
+        setIsPreviewMode(false);
+    }, []);
+
     /* ── undo / redo ─────────────────────────────────────────────── */
 
     const undo = useCallback(async () => {
@@ -277,7 +357,7 @@ export function EditorProvider({ children }) {
         canvas.on('object:removed', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
 
         /* ── pan mode mouse hooks (attached once) ── */
-        syncLayers();
+        if (!surfaceDataRef.current[activeSurfaceRef.current]) syncLayers();
     }, [syncLayers, _constrainObject, _triggerAutoSave]);
 
     /* ── pan mode toggle ─────────────────────────────────────────── */
@@ -600,8 +680,12 @@ export function EditorProvider({ children }) {
         shirtColor, setShirtColor,
         templateDef,
         printArea: _getPrintArea(),
+        surfacePrintAreas,
         setSurfacePrintArea,
-        isPreviewMode, setIsPreviewMode,
+        captureSurfaceSnapshots,
+        restoreCurrentSurface,
+        saveProduct,
+        isPreviewMode, setIsPreviewMode, enterPreviewMode, exitPreviewMode,
         isPanMode, togglePanMode,
         zoomMin: SCENE_ZOOM_MIN,
         zoomMax: SCENE_ZOOM_MAX,

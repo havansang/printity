@@ -12,7 +12,7 @@ export default function TopBar() {
         undo, redo, canUndo, canRedo,
         selectedObjectType, textStyle, updateTextStyle,
         deleteSelected, duplicateSelected,
-        isPreviewMode, setIsPreviewMode,
+        isPreviewMode, enterPreviewMode, exitPreviewMode,
     } = useEditor();
 
     const isBold = textStyle.fontWeight === 'bold';
@@ -30,14 +30,22 @@ export default function TopBar() {
 
             {/* Center */}
             <div className="tb-center">
-                <div className="tb-group">
-                    <button className="tb-icon-btn" id="btn-undo" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"><UndoIcon /></button>
-                    <button className="tb-icon-btn" id="btn-redo" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"><RedoIcon /></button>
-                    {selectedObjectType && <div className="tb-divider" />}
-                </div>
+                {!isPreviewMode && (
+                    <div className="tb-group">
+                        <button className="tb-icon-btn" id="btn-undo" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"><UndoIcon /></button>
+                        <button className="tb-icon-btn" id="btn-redo" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"><RedoIcon /></button>
+                        {selectedObjectType && <div className="tb-divider" />}
+                    </div>
+                )}
+
+                {isPreviewMode && (
+                    <div className="tb-preview-copy" id="tb-preview-copy">
+                        Preview front and back mockups before saving.
+                    </div>
+                )}
 
                 {/* Text contextual */}
-                {selectedObjectType === 'text' && (
+                {!isPreviewMode && selectedObjectType === 'text' && (
                     <div className="tb-group tb-contextual" id="text-ctx-bar">
                         <select
                             className="tb-select tb-font-sel"
@@ -86,7 +94,7 @@ export default function TopBar() {
                 )}
 
                 {/* Image/Shape contextual */}
-                {(selectedObjectType === 'image' || selectedObjectType === 'shape') && (
+                {!isPreviewMode && (selectedObjectType === 'image' || selectedObjectType === 'shape') && (
                     <div className="tb-group tb-contextual" id="obj-ctx-bar">
                         <button className="tb-icon-btn" id="tb-dup-obj" onClick={duplicateSelected} title="Duplicate"><DupIcon /></button>
                         <button className="tb-icon-btn tb-del" id="tb-del-obj" onClick={deleteSelected} title="Delete"><DelIcon /></button>
@@ -97,8 +105,8 @@ export default function TopBar() {
             {/* Right */}
             <div className="tb-group tb-right">
                 <div className="mode-pill" id="mode-pill">
-                    <button className={`mode-btn${!isPreviewMode ? ' active' : ''}`} id="mode-edit" onClick={() => setIsPreviewMode(false)}>Edit</button>
-                    <button className={`mode-btn${isPreviewMode ? ' active' : ''}`} id="mode-preview" onClick={() => setIsPreviewMode(true)}>Preview</button>
+                    <button className={`mode-btn${!isPreviewMode ? ' active' : ''}`} id="mode-edit" onClick={exitPreviewMode}>Edit</button>
+                    <button className={`mode-btn${isPreviewMode ? ' active' : ''}`} id="mode-preview" onClick={enterPreviewMode}>Preview</button>
                 </div>
             </div>
         </header>

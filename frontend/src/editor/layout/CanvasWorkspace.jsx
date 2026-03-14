@@ -86,6 +86,7 @@ export default function CanvasWorkspace() {
         templateDef,
         printArea,
         setSurfacePrintArea,
+        restoreCurrentSurface,
         shirtColor,
         isPreviewMode,
         zoomLevel,
@@ -371,8 +372,10 @@ export default function CanvasWorkspace() {
         canvas.on('object:added', onObjectAdded);
 
         setCanvas(canvas);
-        pushHistoryRef.current?.();
-        queueAlign();
+        restoreCurrentSurface(canvas).then((restored) => {
+            if (!restored) pushHistoryRef.current?.();
+            queueAlign();
+        });
 
         return () => {
             canvas.off('selection:created', onSelected);
