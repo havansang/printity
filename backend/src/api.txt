@@ -1,0 +1,573 @@
+PRINTITY BACKEND API
+Duong dan goc: /api/v1
+
+1. DINH DANG RESPONSE CHUNG
+Success:
+{
+  "success": true,
+  "message": "string",
+  "data": {}
+}
+
+Error:
+{
+  "success": false,
+  "message": "string",
+  "errors": [
+    {
+      "field": "string",
+      "message": "string"
+    }
+  ]
+}
+
+2. AUTH APIs
+
+POST /api/v1/auth/register
+Auth: Khong
+Input:
+- body.email: string, bat buoc, email hop le
+- body.password: string, bat buoc, toi thieu 8 ky tu
+- body.displayName: string, tuy chon, 1-100 ky tu
+Output:
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "user": {
+      "id": "string",
+      "email": "string",
+      "displayName": "string | null",
+      "avatarUrl": "string | null",
+      "authProviders": ["local" | "google"]
+    },
+    "token": "jwt_token"
+  }
+}
+
+POST /api/v1/auth/login
+Auth: Khong
+Input:
+- body.email: string, bat buoc, email hop le
+- body.password: string, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": "string",
+      "email": "string",
+      "displayName": "string | null",
+      "avatarUrl": "string | null",
+      "authProviders": ["local" | "google"]
+    },
+    "token": "jwt_token"
+  }
+}
+
+POST /api/v1/auth/google
+Auth: Khong
+Input:
+- body.idToken: string, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Google login successful",
+  "data": {
+    "user": {
+      "id": "string",
+      "email": "string",
+      "displayName": "string | null",
+      "avatarUrl": "string | null",
+      "authProviders": ["local" | "google"]
+    },
+    "token": "jwt_token"
+  }
+}
+
+GET /api/v1/auth/me
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+Output:
+{
+  "success": true,
+  "message": "Current user fetched successfully",
+  "data": {
+    "user": {
+      "id": "string",
+      "email": "string",
+      "displayName": "string | null",
+      "avatarUrl": "string | null",
+      "authProviders": ["local" | "google"]
+    }
+  }
+}
+
+POST /api/v1/auth/logout
+Auth: Khong bat buoc
+Input:
+- Khong co body
+Output:
+{
+  "success": true,
+  "message": "Logout successful",
+  "data": {}
+}
+
+3. TEMPLATE APIs
+
+GET /api/v1/templates
+Auth: Khong
+Input:
+- query.productType: "tshirt" | "polo", tuy chon
+- query.activeOnly: boolean, tuy chon, mac dinh true
+Output:
+{
+  "success": true,
+  "message": "Templates fetched successfully",
+  "data": {
+    "items": [
+      {
+        "id": "string",
+        "name": "string",
+        "slug": "string",
+        "productType": "tshirt | polo",
+        "description": "string | null",
+        "thumbnailUrl": "string | null",
+        "isActive": true,
+        "sortOrder": 1,
+        "surfaces": {
+          "front": {
+            "label": "string",
+            "templateImageUrl": "string",
+            "overlayImageUrl": "string | null",
+            "maskImageUrl": "string | null",
+            "printArea": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
+            }
+          },
+          "back": {
+            "label": "string",
+            "templateImageUrl": "string",
+            "overlayImageUrl": "string | null",
+            "maskImageUrl": "string | null",
+            "printArea": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
+            }
+          }
+        },
+        "createdAt": "ISODate",
+        "updatedAt": "ISODate"
+      }
+    ]
+  }
+}
+
+GET /api/v1/templates/:id
+Auth: Khong
+Input:
+- params.id: Mongo ObjectId, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Template fetched successfully",
+  "data": {
+    "template": {
+      "id": "string",
+      "name": "string",
+      "slug": "string",
+      "productType": "tshirt | polo",
+      "description": "string | null",
+      "thumbnailUrl": "string | null",
+      "isActive": true,
+      "sortOrder": 1,
+      "surfaces": {
+        "front": {
+          "label": "string",
+          "templateImageUrl": "string",
+          "overlayImageUrl": "string | null",
+          "maskImageUrl": "string | null",
+          "printArea": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          }
+        },
+        "back": {
+          "label": "string",
+          "templateImageUrl": "string",
+          "overlayImageUrl": "string | null",
+          "maskImageUrl": "string | null",
+          "printArea": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          }
+        }
+      },
+      "createdAt": "ISODate",
+      "updatedAt": "ISODate"
+    }
+  }
+}
+
+4. PROJECT APIs
+
+GET /api/v1/projects
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- query.page: number, tuy chon, mac dinh 1
+- query.limit: number, tuy chon, mac dinh 10
+- query.search: string, tuy chon
+- query.productType: "tshirt" | "polo", tuy chon
+- query.sortBy: "updatedAt" | "createdAt" | "name" | "lastOpenedAt", tuy chon
+- query.sortOrder: "asc" | "desc", tuy chon
+Output:
+{
+  "success": true,
+  "message": "Projects fetched successfully",
+  "data": {
+    "items": [
+      {
+        "id": "string",
+        "name": "string",
+        "templateId": "string",
+        "productType": "tshirt | polo",
+        "thumbnailUrl": "string | null",
+        "status": "draft | completed",
+        "updatedAt": "ISODate",
+        "createdAt": "ISODate"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
+}
+
+POST /api/v1/projects
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- body.name: string, bat buoc, 1-100 ky tu
+- body.templateId: ObjectId, bat buoc
+- body.surfaces.front.canvasJson: object, tuy chon
+- body.surfaces.front.previewImageUrl: string | null, tuy chon
+- body.surfaces.back.canvasJson: object, tuy chon
+- body.surfaces.back.previewImageUrl: string | null, tuy chon
+- body.frontCanvasJson: object, tuy chon, legacy payload
+- body.backCanvasJson: object, tuy chon, legacy payload
+- body.thumbnailUrl: string | null, tuy chon
+Output:
+{
+  "success": true,
+  "message": "Project created successfully",
+  "data": {
+    "project": {
+      "id": "string",
+      "name": "string",
+      "templateId": "string",
+      "template": {
+        "id": "string",
+        "name": "string",
+        "slug": "string",
+        "productType": "tshirt | polo",
+        "description": "string | null",
+        "thumbnailUrl": "string | null",
+        "isActive": true,
+        "sortOrder": 1,
+        "surfaces": {
+          "front": {
+            "label": "string",
+            "templateImageUrl": "string",
+            "overlayImageUrl": "string | null",
+            "maskImageUrl": "string | null",
+            "printArea": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
+            }
+          },
+          "back": {
+            "label": "string",
+            "templateImageUrl": "string",
+            "overlayImageUrl": "string | null",
+            "maskImageUrl": "string | null",
+            "printArea": {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
+            }
+          }
+        },
+        "createdAt": "ISODate",
+        "updatedAt": "ISODate"
+      },
+      "productType": "tshirt | polo",
+      "surfaces": {
+        "front": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        },
+        "back": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        }
+      },
+      "frontCanvasJson": {},
+      "backCanvasJson": {},
+      "thumbnailUrl": "string | null",
+      "status": "draft | completed",
+      "lastOpenedAt": "ISODate | null",
+      "createdAt": "ISODate",
+      "updatedAt": "ISODate"
+    }
+  }
+}
+
+GET /api/v1/projects/:id
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Project fetched successfully",
+  "data": {
+    "project": {
+      "id": "string",
+      "name": "string",
+      "templateId": "string",
+      "template": { "...": "same shape as template detail" },
+      "productType": "tshirt | polo",
+      "surfaces": {
+        "front": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        },
+        "back": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        }
+      },
+      "frontCanvasJson": {},
+      "backCanvasJson": {},
+      "thumbnailUrl": "string | null",
+      "status": "draft | completed",
+      "lastOpenedAt": "ISODate | null",
+      "createdAt": "ISODate",
+      "updatedAt": "ISODate"
+    }
+  }
+}
+
+PUT /api/v1/projects/:id
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+- body.name: string, tuy chon
+- body.templateId: ObjectId, tuy chon
+- body.surfaces.front.canvasJson: object, tuy chon
+- body.surfaces.front.previewImageUrl: string | null, tuy chon
+- body.surfaces.back.canvasJson: object, tuy chon
+- body.surfaces.back.previewImageUrl: string | null, tuy chon
+- body.frontCanvasJson: object, tuy chon, legacy payload
+- body.backCanvasJson: object, tuy chon, legacy payload
+- body.thumbnailUrl: string | null, tuy chon
+- body.status: "draft" | "completed", tuy chon
+Output:
+{
+  "success": true,
+  "message": "Project updated successfully",
+  "data": {
+    "project": {
+      "id": "string",
+      "name": "string",
+      "templateId": "string",
+      "template": { "...": "same shape as template detail" },
+      "productType": "tshirt | polo",
+      "surfaces": {
+        "front": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        },
+        "back": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        }
+      },
+      "frontCanvasJson": {},
+      "backCanvasJson": {},
+      "thumbnailUrl": "string | null",
+      "status": "draft | completed",
+      "lastOpenedAt": "ISODate | null",
+      "createdAt": "ISODate",
+      "updatedAt": "ISODate"
+    }
+  }
+}
+
+PATCH /api/v1/projects/:id/autosave
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+- body.surfaces.front.canvasJson: object, tuy chon
+- body.surfaces.front.previewImageUrl: string | null, tuy chon
+- body.surfaces.back.canvasJson: object, tuy chon
+- body.surfaces.back.previewImageUrl: string | null, tuy chon
+- body.frontCanvasJson: object, tuy chon, legacy payload
+- body.backCanvasJson: object, tuy chon, legacy payload
+- body.thumbnailUrl: string | null, tuy chon
+- body.lastOpenedAt: ISO date, tuy chon
+Output:
+{
+  "success": true,
+  "message": "Project autosaved",
+  "data": {
+    "id": "string",
+    "updatedAt": "ISODate"
+  }
+}
+
+DELETE /api/v1/projects/:id
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Project deleted successfully",
+  "data": {}
+}
+
+POST /api/v1/projects/:id/duplicate
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Project duplicated successfully",
+  "data": {
+    "project": {
+      "id": "string",
+      "name": "string",
+      "templateId": "string",
+      "template": { "...": "same shape as template detail" },
+      "productType": "tshirt | polo",
+      "surfaces": {
+        "front": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        },
+        "back": {
+          "canvasJson": {},
+          "previewImageUrl": "string | null"
+        }
+      },
+      "frontCanvasJson": {},
+      "backCanvasJson": {},
+      "thumbnailUrl": "string | null",
+      "status": "draft | completed",
+      "lastOpenedAt": "ISODate | null",
+      "createdAt": "ISODate",
+      "updatedAt": "ISODate"
+    }
+  }
+}
+
+5. ASSET APIs
+
+GET /api/v1/assets
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+Output:
+{
+  "success": true,
+  "message": "Assets fetched successfully",
+  "data": {
+    "items": [
+      {
+        "id": "string",
+        "originalName": "string",
+        "mimeType": "string",
+        "size": 12345,
+        "storageType": "local",
+        "path": "uploads/assets/xxx.png",
+        "url": "/uploads/assets/xxx.png",
+        "width": 100,
+        "height": 100,
+        "createdAt": "ISODate",
+        "updatedAt": "ISODate"
+      }
+    ]
+  }
+}
+
+POST /api/v1/assets/upload
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- content-type: multipart/form-data
+- form-data.file: file image, bat buoc
+- Mime type cho phep: image/png, image/jpeg, image/jpg, image/webp, image/svg+xml
+- Gioi han kich thuoc: MAX_FILE_SIZE_MB trong env, mac dinh 10MB
+Output:
+{
+  "success": true,
+  "message": "Asset uploaded successfully",
+  "data": {
+    "id": "string",
+    "originalName": "string",
+    "mimeType": "string",
+    "size": 12345,
+    "storageType": "local",
+    "path": "uploads/assets/xxx.png",
+    "url": "/uploads/assets/xxx.png",
+    "width": 100,
+    "height": 100,
+    "createdAt": "ISODate",
+    "updatedAt": "ISODate"
+  }
+}
+
+DELETE /api/v1/assets/:id
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- params.id: Mongo ObjectId, bat buoc
+Output:
+{
+  "success": true,
+  "message": "Asset deleted successfully",
+  "data": {}
+}
+
+6. GHI CHU DE FRONTEND GOI API
+- Tat ca API can auth deu dung header Authorization: Bearer <jwt>
+- Project API chap nhan ca payload moi: surfaces.front/back.canvasJson
+- Project API cung chap nhan payload cu: frontCanvasJson va backCanvasJson
+- Upload asset dung multipart/form-data, field ten la file
+- URL file upload tra ve dang /uploads/...

@@ -1,0 +1,148 @@
+PRINTITY MONGODB SCHEMA
+ODM: Mongoose
+
+1. COLLECTION: users
+Model: User
+Muc dich:
+- Luu thong tin nguoi dung
+- Ho tro nhieu auth provider tren cung 1 account
+
+Fields:
+- email: String, required, unique, lowercase, trim
+- displayName: String, default null
+- avatarUrl: String, default null
+- authProviders: [String], enum ["local", "google"], default []
+- passwordHash: String, default null
+- google: Object, default null
+- google.googleId: String, trim
+- google.email: String, lowercase, trim
+- google.emailVerified: Boolean, default false
+- google.picture: String, trim
+- lastLoginAt: Date, default null
+- createdAt: Date, auto by timestamps
+- updatedAt: Date, auto by timestamps
+
+Business rules:
+- Neu authProviders co "local" thi passwordHash bat buoc phai co
+- Neu authProviders co "google" thi google.googleId bat buoc phai co
+- authProviders duoc loai bo gia tri trung lap truoc khi validate
+
+Indexes:
+- unique index: email
+- unique sparse index: google.googleId
+
+2. COLLECTION: templates
+Model: Template
+Muc dich:
+- Luu product template de frontend render editor
+- Moi template thuoc 1 productType va co du 2 mat front/back
+
+Fields:
+- name: String, required, trim
+- slug: String, required, unique, trim
+- productType: String, required, enum ["tshirt", "polo"]
+- description: String, default null
+- surfaces.front: Object, required
+- surfaces.front.label: String, required
+- surfaces.front.templateImageUrl: String, required
+- surfaces.front.overlayImageUrl: String, default null
+- surfaces.front.maskImageUrl: String, default null
+- surfaces.front.printArea.x: Number, required
+- surfaces.front.printArea.y: Number, required
+- surfaces.front.printArea.width: Number, required
+- surfaces.front.printArea.height: Number, required
+- surfaces.back: Object, required
+- surfaces.back.label: String, required
+- surfaces.back.templateImageUrl: String, required
+- surfaces.back.overlayImageUrl: String, default null
+- surfaces.back.maskImageUrl: String, default null
+- surfaces.back.printArea.x: Number, required
+- surfaces.back.printArea.y: Number, required
+- surfaces.back.printArea.width: Number, required
+- surfaces.back.printArea.height: Number, required
+- thumbnailUrl: String, default null
+- isActive: Boolean, default true
+- sortOrder: Number, default 0
+- createdAt: Date, auto by timestamps
+- updatedAt: Date, auto by timestamps
+
+Business rules:
+- Moi template bat buoc co surfaces.front va surfaces.back
+- Moi surface bat buoc co templateImageUrl va printArea
+
+Indexes:
+- unique index: slug
+
+3. COLLECTION: projects
+Model: Project
+Muc dich:
+- Luu editor state cua 1 thiet ke cua user
+- Data canvas luu dang Fabric JSON
+
+Fields:
+- userId: ObjectId, required, ref User
+- name: String, required, trim
+- templateId: ObjectId, required, ref Template
+- productType: String, required, enum ["tshirt", "polo"]
+- surfaces.front: Object
+- surfaces.front.canvasJson: Mixed, default null
+- surfaces.front.previewImageUrl: String, default null
+- surfaces.back: Object
+- surfaces.back.canvasJson: Mixed, default null
+- surfaces.back.previewImageUrl: String, default null
+- thumbnailUrl: String, default null
+- status: String, enum ["draft", "completed"], default "draft"
+- lastOpenedAt: Date, default Date.now
+- createdAt: Date, auto by timestamps
+- updatedAt: Date, auto by timestamps
+
+Business rules:
+- userId duoc lay tu JWT, khong lay tu client body
+- productType la du lieu denormalized tu Template
+- Front/back surface luon co structure on dinh
+- Backend chap nhan payload cu frontCanvasJson/backCanvasJson va map vao surfaces.front/back.canvasJson
+
+Indexes:
+- { userId: 1, updatedAt: -1 }
+- { userId: 1, productType: 1, updatedAt: -1 }
+- text index: name
+
+4. COLLECTION: assets
+Model: Asset
+Muc dich:
+- Luu metadata file anh user upload de dua vao editor
+
+Fields:
+- userId: ObjectId, required, ref User
+- originalName: String, required, trim
+- mimeType: String, required, trim
+- size: Number, required
+- storageType: String, default "local"
+- path: String, required, trim
+- url: String, required, trim
+- width: Number, default null
+- height: Number, default null
+- createdAt: Date, auto by timestamps
+- updatedAt: Date, auto by timestamps
+
+Business rules:
+- Chi owner moi duoc list/delete asset cua minh
+- path la duong dan tuong doi trong uploads/
+- url la public URL de frontend load truc tiep
+- Chi cho phep upload mime type la image
+
+Indexes:
+- { userId: 1, createdAt: -1 }
+
+5. QUAN HE DU LIEU
+- 1 User co nhieu Project
+- 1 User co nhieu Asset
+- 1 Project thuoc 1 User
+- 1 Project tham chieu 1 Template
+- 1 Template thuoc 1 productType
+
+6. ENUMS DANG DUNG
+- authProviders: ["local", "google"]
+- productType: ["tshirt", "polo"]
+- surfaces: ["front", "back"]
+- project.status: ["draft", "completed"]

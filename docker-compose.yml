@@ -1,6 +1,4 @@
-
 services:
-  # MongoDB service
   mongo:
     image: mongo:7
     restart: unless-stopped
@@ -9,20 +7,18 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  # Backend service
   backend:
     build: ./backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.example  # Chỉ định file môi trường cho backend
+      - ./backend/.env.example
     ports:
       - '5000:5000'
     depends_on:
       - mongo
     volumes:
-      - ./uploads:/app/uploads
+      - ./backend/uploads:/app/uploads
 
-  # Frontend service
   frontend:
     build: ./frontend
     restart: unless-stopped
