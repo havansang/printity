@@ -6,8 +6,6 @@ import {
     rasterizePreviewSvg,
 } from './previewUtils';
 
-const PREVIEW_SURFACES = ['front', 'back'];
-
 function triggerDownload(href, filename) {
     const anchor = document.createElement('a');
     anchor.href = href;
@@ -17,15 +15,15 @@ function triggerDownload(href, filename) {
 
 export default function PreviewWorkspace() {
     const {
-        templateDef,
         shirtColor,
+        surfaceDefs,
         surfacePrintAreas,
         captureSurfaceSnapshots,
         saveProduct,
     } = useEditor();
 
     const [previewItems, setPreviewItems] = useState([]);
-    const [selectedSurface, setSelectedSurface] = useState('front');
+    const [selectedSurface, setSelectedSurface] = useState(surfaceDefs[0]?.key || '');
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState('');
     const [downloadSurface, setDownloadSurface] = useState('');
@@ -42,8 +40,9 @@ export default function PreviewWorkspace() {
 
             try {
                 const snapshots = captureSurfaceSnapshots();
-                const items = await Promise.all(PREVIEW_SURFACES.map(async (surface) => {
-                    const source = templateDef?.[surface]?.svg;
+                const items = await Promise.all(surfaceDefs.map(async (surfaceDef) => {
+                    const surface = surfaceDef.key;
+                    const source = surfaceDef.svg;
                     if (!source) return null;
 
                     const response = await fetch(source);
@@ -54,6 +53,7 @@ export default function PreviewWorkspace() {
                     const svgText = await response.text();
                     const preview = await buildSurfacePreview({
                         surface,
+                        placeholderId: surfaceDef.placeholderId,
                         svgText,
                         snapshot: snapshots?.[surface],
                         printArea: surfacePrintAreas?.[surface],
@@ -65,7 +65,7 @@ export default function PreviewWorkspace() {
 
                     return {
                         surface,
-                        label: surface === 'front' ? 'Front side' : 'Back side',
+                        label: surfaceDef.label,
                         filename: `tshirt-${surface}-preview.png`,
                         previewUrl,
                         ...preview,
@@ -79,7 +79,7 @@ export default function PreviewWorkspace() {
                 setSelectedSurface((current) => (
                     filtered.some((item) => item.surface === current)
                         ? current
-                        : filtered[0]?.surface || 'front'
+                        : filtered[0]?.surface || surfaceDefs[0]?.key || ''
                 ));
             } catch (error) {
                 if (!cancelled) setErrorMessage(error?.message || 'Failed to build preview');
@@ -94,7 +94,7 @@ export default function PreviewWorkspace() {
             cancelled = true;
             objectUrls.forEach((url) => URL.revokeObjectURL(url));
         };
-    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas, templateDef]);
+    }, [captureSurfaceSnapshots, shirtColor, surfaceDefs, surfacePrintAreas]);
 
     const selectedItem = useMemo(
         () => previewItems.find((item) => item.surface === selectedSurface) || previewItems[0] || null,

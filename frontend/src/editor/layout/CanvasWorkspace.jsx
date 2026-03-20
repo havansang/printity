@@ -66,6 +66,11 @@ function createEdgeScaleControl({ x, y, axis, size, touchSize }) {
     });
 }
 
+function getSurfacePlaceholderSelector(surfaceDef, surfaceKey) {
+    const placeholderId = surfaceDef?.placeholderId || `placeholder_${surfaceKey}`;
+    return `#${placeholderId}`;
+}
+
 export default function CanvasWorkspace() {
     const sceneRef = useRef(null);
     const svgRef = useRef(null);
@@ -80,10 +85,9 @@ export default function CanvasWorkspace() {
 
     const {
         setCanvas, syncLayers, setSelectedLayerId,
-        activeSurface, surfaces, switchSurface,
+        activeSurface, surfaceDefs, switchSurface,
         pushHistory, undo, redo,
         setSelectedObject,
-        templateDef,
         printArea,
         setSurfacePrintArea,
         restoreCurrentSurface,
@@ -93,6 +97,7 @@ export default function CanvasWorkspace() {
     } = useEditor();
 
     const [svgRevision, setSvgRevision] = useState(0);
+    const activeSurfaceDef = surfaceDefs.find((surface) => surface.key === activeSurface) || null;
 
     useEffect(() => {
         pushHistoryRef.current = pushHistory;
@@ -107,7 +112,7 @@ export default function CanvasWorkspace() {
         const svgEl = svgRef.current;
         if (!sceneEl || !svgEl) return null;
 
-        const placeholder = svgEl.querySelector(`#placeholder_${activeSurface}`);
+        const placeholder = svgEl.querySelector(getSurfacePlaceholderSelector(activeSurfaceDef, activeSurface));
         if (!placeholder) return null;
 
         const sceneRect = sceneEl.getBoundingClientRect();
@@ -124,12 +129,12 @@ export default function CanvasWorkspace() {
             width: printRect.width / sceneZoom,
             height: printRect.height / sceneZoom,
         };
-    }, [activeSurface, zoomLevel]);
+    }, [activeSurface, activeSurfaceDef, zoomLevel]);
 
-    const extractPrintAreaFromSvg = useCallback((svgEl, surface) => {
-        if (!svgEl || !surface) return null;
+    const extractPrintAreaFromSvg = useCallback((svgEl, surfaceDef, surfaceKey) => {
+        if (!svgEl || !surfaceKey) return null;
 
-        const placeholder = svgEl.querySelector(`#placeholder_${surface}`);
+        const placeholder = svgEl.querySelector(getSurfacePlaceholderSelector(surfaceDef, surfaceKey));
         if (!placeholder) return null;
 
         const width = Number.parseFloat(placeholder.getAttribute('width') || '')
@@ -290,7 +295,7 @@ export default function CanvasWorkspace() {
     }, [shirtColor]);
 
     const loadSurfaceSvg = useCallback(async () => {
-        const source = templateDef?.[activeSurface]?.svg;
+        const source = activeSurfaceDef?.svg;
         const currentSvgNode = svgRef.current;
         if (!source || !currentSvgNode) return;
 
@@ -310,7 +315,7 @@ export default function CanvasWorkspace() {
             currentSvgNode.replaceWith(nextSvg);
             svgRef.current = nextSvg;
 
-            const pa = extractPrintAreaFromSvg(nextSvg, activeSurface);
+            const pa = extractPrintAreaFromSvg(nextSvg, activeSurfaceDef, activeSurface);
             if (pa) setSurfacePrintArea(activeSurface, pa);
 
             setSvgRevision((v) => v + 1);
@@ -318,7 +323,7 @@ export default function CanvasWorkspace() {
         } catch (error) {
             console.error('Failed to load SVG surface', error);
         }
-    }, [activeSurface, extractPrintAreaFromSvg, queueAlign, setSurfacePrintArea, templateDef]);
+    }, [activeSurface, activeSurfaceDef, extractPrintAreaFromSvg, queueAlign, setSurfacePrintArea]);
 
     useEffect(() => {
         loadSurfaceSvg();
@@ -433,11 +438,11 @@ export default function CanvasWorkspace() {
         observer.observe(sceneEl);
         observer.observe(svgEl);
 
-        const placeholder = svgEl.querySelector(`#placeholder_${activeSurface}`);
+        const placeholder = svgEl.querySelector(getSurfacePlaceholderSelector(activeSurfaceDef, activeSurface));
         if (placeholder) observer.observe(placeholder);
 
         return () => observer.disconnect();
-    }, [activeSurface, svgRevision, queueAlign]);
+    }, [activeSurface, activeSurfaceDef, svgRevision, queueAlign]);
 
     /* ── keyboard shortcuts ──────────────────────────────────── */
     useEffect(() => {
@@ -464,14 +469,14 @@ export default function CanvasWorkspace() {
         <div className={`editor${isPreviewMode ? ' preview' : ''}`} id="canvas-workspace">
             <div className="toolbar">
                 <div className="surface-tabs" id="surface-tabs">
-                    {surfaces.map((s) => (
+                    {surfaceDefs.map((surface) => (
                         <button
-                            key={s}
-                            className={`surface-tab${s === activeSurface ? ' active' : ''}`}
-                            id={`surface-tab-${s}`}
-                            onClick={() => switchSurface(s)}
+                            key={surface.key}
+                            className={`surface-tab${surface.key === activeSurface ? ' active' : ''}`}
+                            id={`surface-tab-${surface.key}`}
+                            onClick={() => switchSurface(surface.key)}
                         >
-                            {s === 'front' ? 'Front side' : 'Back side'}
+                            {surface.label}
                         </button>
                     ))}
                 </div>

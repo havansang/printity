@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 3568.58 3568.58"
+  width="100%"
+  height="100%">
+
+  <defs>
+    <path id="print-area-path" d="M 1002.29 784.29 H 2566.29 A 68 68 0 0 1 2634.29 852.29 V 2916.29 A 68 68 0 0 1 2566.29 2984.29 H 1002.29 A 68 68 0 0 1 934.29 2916.29 V 852.29 A 68 68 0 0 1 1002.29 784.29 Z" />
+    <clipPath id="print-area-clip">
+      <use href="#print-area-path" />
+    </clipPath>
+    <filter id="disp-blur" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="30" />
+    </filter>
+  </defs>
+  <rect width="3568.58" height="3568.58" fill="#808080" />
+  <g clip-path="url(#print-area-clip)">
+    <rect x="934.29" y="784.29" width="1700" height="2200" fill="#808080" />
+    <path d="M 1240.29 784.29 C 1138.29 1268.29, 1138.29 2060.29, 1342.29 2984.29" fill="none" stroke="#6f6f6f" stroke-opacity="0.32" stroke-width="170" stroke-linecap="round" filter="url(#disp-blur)" />
+    <path d="M 2328.29 784.29 C 2430.29 1356.29, 2430.29 2060.29, 2192.29 2984.29" fill="none" stroke="#929292" stroke-opacity="0.26" stroke-width="170" stroke-linecap="round" filter="url(#disp-blur)" />
+    <path d="M 1784.29 1048.29 C 1682.29 1488.29, 1852.29 2280.29, 1750.29 2940.29" fill="none" stroke="#777777" stroke-opacity="0.18" stroke-width="102" stroke-linecap="round" filter="url(#disp-blur)" />
+    <ellipse cx="1478.29" cy="1400.29" rx="238" ry="264" fill="#8d8d8d" fill-opacity="0.14" filter="url(#disp-blur)" />
+    <ellipse cx="2124.29" cy="2148.29" rx="272" ry="308" fill="#757575" fill-opacity="0.18" filter="url(#disp-blur)" />
+  </g>
+</svg>

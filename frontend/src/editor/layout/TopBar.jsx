@@ -40,7 +40,7 @@ export default function TopBar() {
 
                 {isPreviewMode && (
                     <div className="tb-preview-copy" id="tb-preview-copy">
-                        Preview front and back mockups before saving.
+                        Preview all mockups before saving.
                     </div>
                 )}
 

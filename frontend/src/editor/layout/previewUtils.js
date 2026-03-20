@@ -44,6 +44,16 @@ function setSvgHref(node, value) {
     node.setAttributeNS(XLINK_NS, 'xlink:href', value);
 }
 
+function getPlaceholderSelector(surface, placeholderId) {
+    return `#${placeholderId || `placeholder_${surface}`}`;
+}
+
+function buildSurfaceSeed(surface, offset) {
+    return String(surface || 'surface')
+        .split('')
+        .reduce((sum, char, index) => sum + (char.charCodeAt(0) * (index + 1)), offset);
+}
+
 function parseViewBox(svgEl) {
     const raw = svgEl?.getAttribute('viewBox');
     if (!raw) return DEFAULT_VIEWBOX;
@@ -67,10 +77,10 @@ function getPlaceholderSize(placeholder) {
     return { width, height };
 }
 
-function extractPrintAreaFromSvg(svgEl, surface) {
+function extractPrintAreaFromSvg(svgEl, surface, placeholderId) {
     if (!svgEl || !surface) return null;
 
-    const placeholder = svgEl.querySelector(`#placeholder_${surface}`);
+    const placeholder = svgEl.querySelector(getPlaceholderSelector(surface, placeholderId));
     if (!placeholder) return null;
 
     const { width, height } = getPlaceholderSize(placeholder);
@@ -174,7 +184,7 @@ function addPreviewDefs(defs, surface) {
             <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.08 0 0 0 0.32 0" />
         </filter>
         <filter id="${ids.warpId}" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
-            <feTurbulence type="fractalNoise" baseFrequency="0.018 0.03" numOctaves="2" seed="${surface === 'front' ? 13 : 19}" stitchTiles="stitch" result="noise" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.018 0.03" numOctaves="2" seed="${buildSurfaceSeed(surface, 13)}" stitchTiles="stitch" result="noise" />
             <feGaussianBlur in="noise" stdDeviation="0.45" result="softNoise" />
             <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="20" xChannelSelector="R" yChannelSelector="G" result="warped" />
             <feGaussianBlur in="warped" stdDeviation="0.18" result="softened" />
@@ -184,7 +194,7 @@ function addPreviewDefs(defs, surface) {
             </feComponentTransfer>
         </filter>
         <filter id="${ids.textureId}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-            <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="${surface === 'front' ? 23 : 29}" stitchTiles="stitch" result="noise" />
+            <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="${buildSurfaceSeed(surface, 29)}" stitchTiles="stitch" result="noise" />
             <feColorMatrix in="noise" type="saturate" values="0" result="monoNoise" />
             <feComponentTransfer in="monoNoise" result="grain">
                 <feFuncR type="gamma" amplitude="1.2" exponent="0.82" offset="0" />
@@ -206,13 +216,14 @@ function addPreviewDefs(defs, surface) {
 
 function injectDesignIntoSvg(svgEl, {
     surface,
+    placeholderId,
     designDataUrl,
     shirtColor,
     printArea,
     sceneSize,
 }) {
     const defs = svgEl.querySelector('defs');
-    const placeholder = svgEl.querySelector(`#placeholder_${surface}`);
+    const placeholder = svgEl.querySelector(getPlaceholderSelector(surface, placeholderId));
     if (!placeholder) return;
 
     const { width, height } = getPlaceholderSize(placeholder);
@@ -318,6 +329,7 @@ function loadImage(src) {
 
 export async function buildSurfacePreview({
     surface,
+    placeholderId,
     svgText,
     snapshot,
     printArea,
@@ -329,10 +341,11 @@ export async function buildSurfacePreview({
     if (!svgEl) throw new Error(`Missing SVG root for ${surface}`);
 
     const sceneSize = parseViewBox(svgEl);
-    const effectivePrintArea = extractPrintAreaFromSvg(svgEl, surface) || printArea;
+    const effectivePrintArea = extractPrintAreaFromSvg(svgEl, surface, placeholderId) || printArea;
     const designDataUrl = await renderDesignDataUrl(snapshot, sceneSize);
     injectDesignIntoSvg(svgEl, {
         surface,
+        placeholderId,
         designDataUrl,
         shirtColor,
         printArea: effectivePrintArea,

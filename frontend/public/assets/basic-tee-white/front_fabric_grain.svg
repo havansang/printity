@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 3568.58 3568.58"
+  width="100%"
+  height="100%">
+
+  <defs>
+    <path id="print-area-path" d="M 1002.29 784.29 H 2566.29 A 68 68 0 0 1 2634.29 852.29 V 2916.29 A 68 68 0 0 1 2566.29 2984.29 H 1002.29 A 68 68 0 0 1 934.29 2916.29 V 852.29 A 68 68 0 0 1 1002.29 784.29 Z" />
+    <clipPath id="print-area-clip">
+      <use href="#print-area-path" />
+    </clipPath>
+    <filter id="grain-noise" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.92" numOctaves="2" seed="17" stitchTiles="stitch" result="noise" />
+      <feColorMatrix in="noise" type="saturate" values="0" result="monoNoise" />
+      <feComponentTransfer in="monoNoise" result="grain">
+        <feFuncR type="gamma" amplitude="1.08" exponent="0.88" offset="0" />
+        <feFuncG type="gamma" amplitude="1.08" exponent="0.88" offset="0" />
+        <feFuncB type="gamma" amplitude="1.08" exponent="0.88" offset="0" />
+        <feFuncA type="table" tableValues="0 0.1" />
+      </feComponentTransfer>
+    </filter>
+    <linearGradient id="grain-fade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.08" />
+    </linearGradient>
+  </defs>
+  <rect width="3568.58" height="3568.58" fill="transparent" />
+  <g clip-path="url(#print-area-clip)">
+    <rect x="934.29" y="784.29" width="1700" height="2200" fill="#ffffff" filter="url(#grain-noise)" opacity="0.75" />
+    <rect x="934.29" y="784.29" width="1700" height="2200" fill="url(#grain-fade)" opacity="0.22" />
+  </g>
+</svg>
