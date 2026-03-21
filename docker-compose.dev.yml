@@ -28,6 +28,8 @@ services:
       context: ./frontend
       target: dev
     restart: unless-stopped
+    env_file:
+      - ./frontend/.env.example
     environment:
       CHOKIDAR_USEPOLLING: "true"
     ports:

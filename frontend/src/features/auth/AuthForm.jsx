@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../../app/router';
+import { APP_CONFIG } from '../../shared/config/appConfig';
 import { useAuth } from './AuthContext';
+import { loadGoogleIdentityScript } from './googleIdentity';
 
 function validate(mode, formState) {
     const nextErrors = {};
@@ -50,17 +52,6 @@ function GoogleIcon() {
             <path
                 fill="#EA4335"
                 d="M12 5.8c1.78 0 2.98.75 3.66 1.38l2.67-2.55C16.96 3.38 14.7 2 12 2 8.05 2 4.68 4.23 3.02 7.59l3.29 2.47C7.11 7.52 9.36 5.8 12 5.8Z"
-            />
-        </svg>
-    );
-}
-
-function AppleIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="auth-icon-svg auth-icon-svg-apple">
-            <path
-                fill="currentColor"
-                d="M16.85 12.59c.03 3.27 2.87 4.36 2.9 4.37-.02.08-.45 1.53-1.49 3.02-.9 1.29-1.84 2.58-3.31 2.61-1.44.03-1.9-.85-3.54-.85-1.64 0-2.15.82-3.51.88-1.42.05-2.5-1.42-3.4-2.7-1.84-2.64-3.24-7.45-1.36-10.72.93-1.62 2.59-2.64 4.39-2.67 1.37-.03 2.66.92 3.49.92.83 0 2.4-1.14 4.05-.97.69.03 2.62.28 3.86 2.08-.1.06-2.3 1.34-2.28 4.03Zm-2.54-7.26c.76-.91 1.28-2.18 1.14-3.44-1.09.04-2.41.72-3.19 1.63-.7.8-1.31 2.09-1.15 3.32 1.21.09 2.44-.61 3.2-1.51Z"
             />
         </svg>
     );
@@ -141,9 +132,9 @@ function CheckIcon() {
     );
 }
 
-function SocialButton({ icon, label, onClick }) {
+function SocialButton({ icon, label, onClick, disabled = false }) {
     return (
-        <button type="button" className="social-auth-btn" onClick={onClick}>
+        <button type="button" className="social-auth-btn" onClick={onClick} disabled={disabled}>
             <span className="social-auth-icon">{icon}</span>
             <span>{label}</span>
         </button>
@@ -172,7 +163,7 @@ function VerificationPlaceholder() {
 }
 
 export default function AuthForm({ mode, onModeChange }) {
-    const { login, register } = useAuth();
+    const { login, loginWithGoogle, register } = useAuth();
     const [formState, setFormState] = useState({
         email: '',
         password: '',
@@ -182,14 +173,22 @@ export default function AuthForm({ mode, onModeChange }) {
     const [submitError, setSubmitError] = useState('');
     const [socialNotice, setSocialNotice] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+    const [googleStatus, setGoogleStatus] = useState(
+        APP_CONFIG.googleClientId ? 'loading' : 'unavailable'
+    );
     const [showPassword, setShowPassword] = useState(false);
+    const googleButtonRef = useRef(null);
 
     const isRegisterMode = mode === 'register';
+    const isGoogleConfigured = Boolean(APP_CONFIG.googleClientId);
+    const isBusy = isSubmitting || isGoogleSubmitting;
 
     useEffect(() => {
         setFieldErrors({});
         setSubmitError('');
         setSocialNotice('');
+        setIsGoogleSubmitting(false);
         setShowPassword(false);
         setFormState((previous) => ({
             email: previous.email,
@@ -197,6 +196,124 @@ export default function AuthForm({ mode, onModeChange }) {
             receiveUpdates: previous.receiveUpdates,
         }));
     }, [mode]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (!isGoogleConfigured) {
+            setGoogleStatus('unavailable');
+            return undefined;
+        }
+
+        setGoogleStatus(window.google?.accounts?.id ? 'ready' : 'loading');
+
+        loadGoogleIdentityScript()
+            .then(() => {
+                if (!isCancelled) {
+                    setGoogleStatus('ready');
+                }
+            })
+            .catch((error) => {
+                if (!isCancelled) {
+                    setGoogleStatus('error');
+                    setSocialNotice(error?.message || 'Google sign-in could not be loaded right now.');
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isGoogleConfigured]);
+
+    useEffect(() => {
+        if (googleStatus !== 'ready' || !isGoogleConfigured || !googleButtonRef.current) {
+            return undefined;
+        }
+
+        const googleAccounts = window.google?.accounts?.id;
+        if (!googleAccounts) {
+            return undefined;
+        }
+
+        let isCancelled = false;
+        const buttonHost = googleButtonRef.current;
+        let lastRenderedWidth = 0;
+
+        const renderGoogleButton = () => {
+            const nextWidth = Math.max(Math.floor(buttonHost.getBoundingClientRect().width), 240);
+            if (nextWidth === lastRenderedWidth && buttonHost.childElementCount > 0) {
+                return;
+            }
+
+            lastRenderedWidth = nextWidth;
+            buttonHost.innerHTML = '';
+
+            googleAccounts.initialize({
+                client_id: APP_CONFIG.googleClientId,
+                auto_select: false,
+                cancel_on_tap_outside: true,
+                context: isRegisterMode ? 'signup' : 'signin',
+                callback: async (response) => {
+                    if (isCancelled) {
+                        return;
+                    }
+
+                    setSubmitError('');
+                    setSocialNotice('');
+                    setFieldErrors({});
+
+                    if (!response?.credential) {
+                        setSubmitError('Google did not return an ID token. Please try again.');
+                        return;
+                    }
+
+                    setIsGoogleSubmitting(true);
+
+                    try {
+                        await loginWithGoogle({ idToken: response.credential });
+                        navigate('/');
+                    } catch (error) {
+                        if (isCancelled) {
+                            return;
+                        }
+
+                        setFieldErrors(collectApiErrors(error));
+                        setSubmitError(error?.message || 'Google sign-in failed. Please try again.');
+                    } finally {
+                        if (!isCancelled) {
+                            setIsGoogleSubmitting(false);
+                        }
+                    }
+                },
+            });
+
+            googleAccounts.renderButton(buttonHost, {
+                theme: 'outline',
+                size: 'large',
+                text: 'continue_with',
+                shape: 'rectangular',
+                logo_alignment: 'left',
+                locale: 'en',
+                width: nextWidth,
+            });
+        };
+
+        renderGoogleButton();
+
+        let resizeObserver;
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(() => {
+                renderGoogleButton();
+            });
+            resizeObserver.observe(buttonHost);
+        }
+
+        return () => {
+            isCancelled = true;
+            resizeObserver?.disconnect();
+            buttonHost.innerHTML = '';
+        };
+    }, [googleStatus, isGoogleConfigured, isRegisterMode, loginWithGoogle]);
 
     const handleChange = (event) => {
         const { name, value, type, checked } = event.target;
@@ -210,13 +327,22 @@ export default function AuthForm({ mode, onModeChange }) {
         });
     };
 
-    const handleSocialClick = (provider) => {
-        if (provider === 'google') {
-            setSocialNotice('Google sign-in is ready for hookup as soon as the Google identity client is configured.');
+    const handleGoogleClick = () => {
+        if (!isGoogleConfigured) {
+            setSocialNotice(
+                'Google sign-in needs the same Google client ID to be exposed to the frontend.'
+            );
             return;
         }
 
-        setSocialNotice('Apple sign-in is planned in the interface, but the backend flow is not available yet.');
+        if (googleStatus === 'loading') {
+            setSocialNotice('Google sign-in is still loading. Please wait a moment and try again.');
+            return;
+        }
+
+        if (googleStatus === 'error') {
+            setSocialNotice('Google sign-in could not be loaded. Refresh the page and try again.');
+        }
     };
 
     const handleSubmit = async (event) => {
@@ -271,16 +397,21 @@ export default function AuthForm({ mode, onModeChange }) {
             </div>
 
             <div className="social-auth-group">
-                <SocialButton
-                    icon={<GoogleIcon />}
-                    label="Continue with Google"
-                    onClick={() => handleSocialClick('google')}
-                />
-                <SocialButton
-                    icon={<AppleIcon />}
-                    label="Continue with Apple"
-                    onClick={() => handleSocialClick('apple')}
-                />
+                {googleStatus === 'ready' ? (
+                    <div className={`google-auth-slot${isBusy ? ' google-auth-slot-disabled' : ''}`}>
+                        <div ref={googleButtonRef} className="google-auth-button-host" />
+                        {isGoogleSubmitting && (
+                            <div className="google-auth-overlay">Signing in with Google...</div>
+                        )}
+                    </div>
+                ) : (
+                    <SocialButton
+                        icon={<GoogleIcon />}
+                        label={googleStatus === 'loading' ? 'Preparing Google...' : 'Continue with Google'}
+                        onClick={handleGoogleClick}
+                        disabled={isBusy || googleStatus === 'loading'}
+                    />
+                )}
             </div>
 
             <div className="auth-divider">
@@ -344,7 +475,7 @@ export default function AuthForm({ mode, onModeChange }) {
                 {submitError && <div className="auth-message auth-message-error">{submitError}</div>}
                 {socialNotice && <div className="auth-message auth-message-info">{socialNotice}</div>}
 
-                <button className="auth-submit" type="submit" disabled={isSubmitting}>
+                <button className="auth-submit" type="submit" disabled={isBusy}>
                     {isSubmitting
                         ? (isRegisterMode ? 'Creating account...' : 'Signing in...')
                         : (isRegisterMode ? 'Sign up' : 'Sign in')}

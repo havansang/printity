@@ -9,6 +9,7 @@ import {
 import {
     getCurrentUser,
     login as loginRequest,
+    loginWithGoogle as loginWithGoogleRequest,
     logout as logoutRequest,
     register as registerRequest,
 } from './authApi';
@@ -108,6 +109,15 @@ export function AuthProvider({ children }) {
         return payload;
     }, [persistSession]);
 
+    const loginWithGoogle = useCallback(async (credentials) => {
+        const payload = await loginWithGoogleRequest(credentials);
+        persistSession({
+            token: payload?.data?.token || '',
+            user: payload?.data?.user || null,
+        });
+        return payload;
+    }, [persistSession]);
+
     const logout = useCallback(async () => {
         const activeToken = session.token;
         clearSession();
@@ -127,12 +137,14 @@ export function AuthProvider({ children }) {
         isInitializing,
         isAuthenticated: Boolean(session.token),
         login,
+        loginWithGoogle,
         register,
         logout,
         refreshCurrentUser,
     }), [
         isInitializing,
         login,
+        loginWithGoogle,
         logout,
         refreshCurrentUser,
         register,

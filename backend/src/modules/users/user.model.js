@@ -85,7 +85,9 @@ userSchema.pre('validate', function validateProviders(next) {
   }
 
   this.authProviders = [...new Set(this.authProviders)];
-  next();
+  if (typeof next === 'function') {
+    return next();
+  }
 });
 
 const User = mongoose.model('User', userSchema);

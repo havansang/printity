@@ -14,6 +14,13 @@ export function login(payload) {
     });
 }
 
+export function loginWithGoogle(payload) {
+    return apiRequest('/auth/google', {
+        method: 'POST',
+        body: payload,
+    });
+}
+
 export function getCurrentUser(token) {
     return apiRequest('/auth/me', {
         method: 'GET',
