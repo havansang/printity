@@ -4,7 +4,9 @@ import { useEditor } from './EditorContext';
 const ZOOM_STEP = 1.1;
 
 export default function BottomToolbar() {
-    const { zoomLevel, zoomMin, zoomMax, applyZoom, isPanMode, togglePanMode } = useEditor();
+    const {
+        zoomLevel, zoomMin, zoomMax, applyZoom, isPanMode, togglePanMode, saveProduct,
+    } = useEditor();
     const [spacePressed, setSpacePressed] = useState(false);
     const pct = Math.round(zoomLevel * 100);
     const handActive = isPanMode || spacePressed;
@@ -71,7 +73,7 @@ export default function BottomToolbar() {
             </div>
 
             <div className="bt-group bt-right">
-                <button className="bt-save-btn" id="bt-save">
+                <button className="bt-save-btn" id="bt-save" onClick={saveProduct}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
                     Save Product
                 </button>

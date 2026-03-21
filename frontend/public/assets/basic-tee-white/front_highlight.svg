@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 3568.58 3568.58"
+  width="100%"
+  height="100%">
+
+  <defs>
+    <path id="print-area-path" d="M 1002.29 784.29 H 2566.29 A 68 68 0 0 1 2634.29 852.29 V 2916.29 A 68 68 0 0 1 2566.29 2984.29 H 1002.29 A 68 68 0 0 1 934.29 2916.29 V 852.29 A 68 68 0 0 1 1002.29 784.29 Z" />
+    <clipPath id="print-area-clip">
+      <use href="#print-area-path" />
+    </clipPath>
+    <filter id="highlight-blur" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="28" />
+    </filter>
+    <linearGradient id="highlight-sweep" x1="12%" y1="6%" x2="88%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.34" />
+      <stop offset="32%" stop-color="#ffffff" stop-opacity="0.14" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <radialGradient id="highlight-left" cx="26%" cy="18%" r="44%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.52" />
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="highlight-right" cx="84%" cy="22%" r="38%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22" />
+      <stop offset="65%" stop-color="#ffffff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#print-area-clip)">
+    <rect x="934.29" y="784.29" width="1700" height="2200" fill="url(#highlight-sweep)" />
+    <ellipse cx="1410.29" cy="1180.29" rx="561" ry="396" fill="url(#highlight-left)" filter="url(#highlight-blur)" />
+    <ellipse cx="2328.29" cy="1136.29" rx="340" ry="308" fill="url(#highlight-right)" filter="url(#highlight-blur)" />
+    <path d="M 1308.29 1356.29 C 1648.29 1224.29, 1886.29 1048.29, 2192.29 1180.29" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="102" stroke-linecap="round" filter="url(#highlight-blur)" />
+    <path d="M 1614.29 1972.29 C 1784.29 1796.29, 1988.29 1928.29, 2192.29 1840.29" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="136" stroke-linecap="round" filter="url(#highlight-blur)" />
+  </g>
+</svg>

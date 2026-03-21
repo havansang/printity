@@ -2,9 +2,8 @@ import {
     createContext, useContext, useCallback, useRef, useState, useEffect,
 } from 'react';
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
-import { templates } from '../../templates/templates';
+import { getTemplateSurfaces, templates } from '../../templates/templates';
 
-const SURFACES = ['front', 'back'];
 const CUSTOM_PROPS = ['_layerId', '_imageName', '_shapeType', '_layerType'];
 const MAX_HISTORY = 50;
 const AUTO_SAVE_DELAY = 1000;
@@ -14,9 +13,22 @@ const SCENE_ZOOM_MAX = 4;
 const SCENE_ZOOM_STEP = 1.1;
 
 const TEMPLATE_KEY = 'tshirt';
+const TEMPLATE_DEF = templates[TEMPLATE_KEY] || {};
+const TEMPLATE_SURFACE_DEFS = getTemplateSurfaces(TEMPLATE_DEF);
+const TEMPLATE_SURFACE_KEYS = TEMPLATE_SURFACE_DEFS.map((surface) => surface.key);
+const PRODUCT_DRAFT_STORAGE_KEY = 'printity.productDraft';
 
 const EditorContext = createContext(null);
 let _nextId = 1;
+
+function cloneSerializable(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+}
+
+function createSurfaceMap(surfaceKeys, createValue) {
+    return Object.fromEntries(surfaceKeys.map((surfaceKey) => [surfaceKey, createValue(surfaceKey)]));
+}
 
 /* ── Color palette from spec ──────────────────────────────── */
 export const SHIRT_COLORS = [
@@ -47,24 +59,24 @@ export function EditorProvider({ children }) {
     const [selectedLayerId, setSelectedLayerId] = useState(null);
     const selectedObjectRef = useRef(null);
 
-    /* ---------- multi-surface ---------------------------------------- */
-    const [activeSurface, setActiveSurface] = useState('front');
-    const activeSurfaceRef = useRef('front');
-    const surfaceDataRef = useRef({ front: null, back: null });
-
     /* ---------- template --------------------------------------------- */
-    const templateDef = templates[TEMPLATE_KEY];
+    const templateDef = TEMPLATE_DEF;
+    const surfaceDefs = TEMPLATE_SURFACE_DEFS;
+    const surfaceKeys = TEMPLATE_SURFACE_KEYS;
+    const defaultSurface = surfaceKeys[0] || 'front';
+
+    /* ---------- multi-surface ---------------------------------------- */
+    const [activeSurface, setActiveSurface] = useState(defaultSurface);
+    const activeSurfaceRef = useRef(defaultSurface);
+    const surfaceDataRef = useRef(createSurfaceMap(surfaceKeys, () => null));
+
     const [shirtColor, setShirtColor] = useState('#FFFFFF');
-    const [surfacePrintAreas, setSurfacePrintAreas] = useState({
-        front: DEFAULT_PRINT_AREA,
-        back: DEFAULT_PRINT_AREA,
-    });
+    const [surfacePrintAreas, setSurfacePrintAreas] = useState(
+        createSurfaceMap(surfaceKeys, () => cloneSerializable(DEFAULT_PRINT_AREA))
+    );
 
     /* ---------- history ---------------------------------------------- */
-    const historyRef = useRef({
-        front: { stack: [], pointer: -1 },
-        back: { stack: [], pointer: -1 },
-    });
+    const historyRef = useRef(createSurfaceMap(surfaceKeys, () => ({ stack: [], pointer: -1 })));
     const _isRestoringHistory = useRef(false);
     const [canUndo, setCanUndo] = useState(false);
     const [canRedo, setCanRedo] = useState(false);
@@ -137,7 +149,7 @@ export function EditorProvider({ children }) {
     }, []);
 
     const _refreshUndoRedo = useCallback(() => {
-        const h = historyRef.current[activeSurface];
+        const h = historyRef.current[activeSurface] || { stack: [], pointer: -1 };
         setCanUndo(h.pointer > 0);
         setCanRedo(h.pointer < h.stack.length - 1);
     }, [activeSurface]);
@@ -214,7 +226,8 @@ export function EditorProvider({ children }) {
         const canvas = canvasRef.current;
         if (!canvas || _isRestoringHistory.current) return;
         const json = canvas.toJSON(CUSTOM_PROPS);
-        const h = historyRef.current[activeSurface];
+        const h = historyRef.current[activeSurface] || { stack: [], pointer: -1 };
+        historyRef.current[activeSurface] = h;
         h.stack = h.stack.slice(0, h.pointer + 1);
         h.stack.push(json);
         if (h.stack.length > MAX_HISTORY) h.stack.shift();
@@ -234,11 +247,82 @@ export function EditorProvider({ children }) {
         }, AUTO_SAVE_DELAY);
     }, []);
 
+    const captureSurfaceSnapshots = useCallback(() => {
+        const canvas = canvasRef.current;
+        const surface = activeSurfaceRef.current;
+        const canReadCanvas = Boolean(canvas && !canvas.disposed && !canvas.destroyed);
+
+        if (autoSaveTimer.current) {
+            clearTimeout(autoSaveTimer.current);
+            autoSaveTimer.current = null;
+        }
+
+        if (canReadCanvas) {
+            surfaceDataRef.current[surface] = canvas.toJSON(CUSTOM_PROPS);
+        }
+
+        return createSurfaceMap(surfaceKeys, (surfaceKey) => cloneSerializable(surfaceDataRef.current[surfaceKey]));
+    }, [surfaceKeys]);
+
+    const restoreCurrentSurface = useCallback(async (canvas) => {
+        const targetCanvas = canvas || canvasRef.current;
+        const snapshot = surfaceDataRef.current[activeSurfaceRef.current];
+        if (!targetCanvas || !snapshot) return false;
+
+        _isRestoringHistory.current = true;
+        await targetCanvas.loadFromJSON(cloneSerializable(snapshot));
+        targetCanvas.requestRenderAll();
+        _isRestoringHistory.current = false;
+        syncLayers();
+        _refreshUndoRedo();
+        return true;
+    }, [_refreshUndoRedo, syncLayers]);
+
+    const saveProduct = useCallback(() => {
+        const payload = {
+            templateKey: TEMPLATE_KEY,
+            savedAt: new Date().toISOString(),
+            shirtColor,
+            activeSurface: activeSurfaceRef.current,
+            printAreas: cloneSerializable(surfacePrintAreas),
+            surfaces: captureSurfaceSnapshots(),
+        };
+
+        try {
+            window.localStorage.setItem(PRODUCT_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+            return { ok: true, storageKey: PRODUCT_DRAFT_STORAGE_KEY, payload };
+        } catch (error) {
+            console.error('Failed to save product draft', error);
+            return { ok: false, error, payload };
+        }
+    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas]);
+
+    const enterPreviewMode = useCallback(() => {
+        captureSurfaceSnapshots();
+        setSelectedLayerId(null);
+        setSelectedObjectType(null);
+        selectedObjectRef.current = null;
+        setTextStyle({
+            fontSize: 28,
+            fontFamily: 'Inter, sans-serif',
+            fill: '#222222',
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textAlign: 'left',
+            isText: false,
+        });
+        setIsPreviewMode(true);
+    }, [captureSurfaceSnapshots]);
+
+    const exitPreviewMode = useCallback(() => {
+        setIsPreviewMode(false);
+    }, []);
+
     /* ── undo / redo ─────────────────────────────────────────────── */
 
     const undo = useCallback(async () => {
         const canvas = canvasRef.current;
-        const h = historyRef.current[activeSurface];
+        const h = historyRef.current[activeSurface] || { stack: [], pointer: -1 };
         if (!canvas || h.pointer <= 0) return;
         _isRestoringHistory.current = true;
         h.pointer--;
@@ -251,7 +335,7 @@ export function EditorProvider({ children }) {
 
     const redo = useCallback(async () => {
         const canvas = canvasRef.current;
-        const h = historyRef.current[activeSurface];
+        const h = historyRef.current[activeSurface] || { stack: [], pointer: -1 };
         if (!canvas || h.pointer >= h.stack.length - 1) return;
         _isRestoringHistory.current = true;
         h.pointer++;
@@ -277,7 +361,7 @@ export function EditorProvider({ children }) {
         canvas.on('object:removed', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
 
         /* ── pan mode mouse hooks (attached once) ── */
-        syncLayers();
+        if (!surfaceDataRef.current[activeSurfaceRef.current]) syncLayers();
     }, [syncLayers, _constrainObject, _triggerAutoSave]);
 
     /* ── pan mode toggle ─────────────────────────────────────────── */
@@ -559,7 +643,7 @@ export function EditorProvider({ children }) {
     const switchSurface = useCallback(async (target) => {
         const canvas = canvasRef.current;
         const fromSurface = activeSurfaceRef.current;
-        if (!canvas || target === fromSurface) return;
+        if (!canvas || !surfaceKeys.includes(target) || target === fromSurface) return;
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
         _isRestoringHistory.current = true;
@@ -577,10 +661,10 @@ export function EditorProvider({ children }) {
         setSelectedObjectType(null);
         selectedObjectRef.current = null;
         syncLayers();
-        const th = historyRef.current[target];
+        const th = historyRef.current[target] || { stack: [], pointer: -1 };
         setCanUndo(th.pointer > 0);
         setCanRedo(th.pointer < th.stack.length - 1);
-    }, [syncLayers]);
+    }, [surfaceKeys, syncLayers]);
 
     /* ── value ───────────────────────────────────────────────────── */
 
@@ -591,7 +675,7 @@ export function EditorProvider({ children }) {
         addText, addImage, addImageFromDataUrl, addShape,
         selectLayer, deleteLayer, deleteSelected, duplicateSelected,
         updateObjectTransform, alignObject,
-        activeSurface, surfaces: SURFACES, switchSurface,
+        activeSurface, surfaces: surfaceKeys, surfaceDefs, switchSurface,
         pushHistory, undo, redo, canUndo, canRedo,
         reorderLayers,
         textStyle, setSelectedObject, updateTextStyle,
@@ -600,8 +684,12 @@ export function EditorProvider({ children }) {
         shirtColor, setShirtColor,
         templateDef,
         printArea: _getPrintArea(),
+        surfacePrintAreas,
         setSurfacePrintArea,
-        isPreviewMode, setIsPreviewMode,
+        captureSurfaceSnapshots,
+        restoreCurrentSurface,
+        saveProduct,
+        isPreviewMode, setIsPreviewMode, enterPreviewMode, exitPreviewMode,
         isPanMode, togglePanMode,
         zoomMin: SCENE_ZOOM_MIN,
         zoomMax: SCENE_ZOOM_MAX,

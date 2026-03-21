@@ -1,0 +1,57 @@
+{
+  "productId": "basic-tee-white",
+  "sourceTemplate": "/front.svg",
+  "format": "svg",
+  "viewBox": {
+    "minX": 0,
+    "minY": 0,
+    "width": 3568.58,
+    "height": 3568.58
+  },
+  "views": {
+    "front": {
+      "base": "/assets/basic-tee-white/front_base.svg",
+      "mask": "/assets/basic-tee-white/front_mask.svg",
+      "shadow": "/assets/basic-tee-white/front_shadow.svg",
+      "highlight": "/assets/basic-tee-white/front_highlight.svg",
+      "collarOcclusion": "/assets/basic-tee-white/front_collar_occlusion.svg",
+      "displacement": "/assets/basic-tee-white/front_displacement.svg",
+      "grain": "/assets/basic-tee-white/front_fabric_grain.svg"
+    }
+  },
+  "printArea": {
+    "front": {
+      "x": 934.29,
+      "y": 784.29,
+      "width": 1700,
+      "height": 2200,
+      "safeZone": {
+        "x": 1070.29,
+        "y": 960.29,
+        "width": 1428,
+        "height": 1848
+      },
+      "bleed": {
+        "top": 36,
+        "right": 36,
+        "bottom": 36,
+        "left": 36
+      },
+      "cornerRadius": 68,
+      "anchor": {
+        "x": 1784.29,
+        "y": 1884.29
+      }
+    }
+  },
+  "composeOrder": [
+    "base",
+    "design",
+    "mask",
+    "shadow",
+    "collarOcclusion",
+    "highlight",
+    "displacement",
+    "grain"
+  ]
+}
