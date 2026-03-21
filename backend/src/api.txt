@@ -86,6 +86,60 @@ Output:
   }
 }
 
+POST /api/v1/auth/forgot-password/request-otp
+Auth: Khong
+Input:
+- body.email: string, bat buoc, email hop le
+Output:
+{
+  "success": true,
+  "message": "If this email exists, we’ve sent a verification code",
+  "data": {
+    "resendAfterSeconds": 30,
+    "otpExpiresInSeconds": 300
+  }
+}
+Ghi chu:
+- Luon tra ve message chung de khong lo email co ton tai hay khong
+- Backend gioi han 1 OTP / 30s va toi da 5 OTP / 10 phut
+
+POST /api/v1/auth/forgot-password/verify-otp
+Auth: Khong
+Input:
+- body.email: string, bat buoc, email hop le
+- body.otp: string, bat buoc, dung 6 chu so
+Output khi dung:
+{
+  "success": true,
+  "message": "OTP verified successfully",
+  "data": {
+    "resetToken": "opaque_token",
+    "resetTokenExpiresInSeconds": 600
+  }
+}
+Loi co the gap:
+- "Invalid code"
+- "This code has expired. Please request a new one."
+- "Too many invalid attempts. Please request a new code."
+
+POST /api/v1/auth/forgot-password/reset
+Auth: Khong
+Input:
+- body.email: string, bat buoc, email hop le
+- body.resetToken: string, bat buoc
+- body.password: string, bat buoc, toi thieu 8 ky tu
+- body.confirmPassword: string, bat buoc, phai trung password
+Output:
+{
+  "success": true,
+  "message": "Password updated successfully",
+  "data": {}
+}
+Ghi chu:
+- Backend hash password moi
+- OTP/reset token chi dung 1 lan
+- Sau khi reset password, tat ca JWT session cu deu het hieu luc
+
 GET /api/v1/auth/me
 Auth: Bearer token
 Input:
@@ -571,3 +625,5 @@ Output:
 - Project API cung chap nhan payload cu: frontCanvasJson va backCanvasJson
 - Upload asset dung multipart/form-data, field ten la file
 - URL file upload tra ve dang /uploads/...
+- Forgot password request OTP luon tra ve message chung de tranh email enumeration
+- OTP reset password hien tai la ma 6 so, het han sau 5 phut, khoa sau 5 lan nhap sai

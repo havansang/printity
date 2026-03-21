@@ -21,6 +21,27 @@ export function loginWithGoogle(payload) {
     });
 }
 
+export function requestPasswordResetOtp(payload) {
+    return apiRequest('/auth/forgot-password/request-otp', {
+        method: 'POST',
+        body: payload,
+    });
+}
+
+export function verifyPasswordResetOtp(payload) {
+    return apiRequest('/auth/forgot-password/verify-otp', {
+        method: 'POST',
+        body: payload,
+    });
+}
+
+export function resetPassword(payload) {
+    return apiRequest('/auth/forgot-password/reset', {
+        method: 'POST',
+        body: payload,
+    });
+}
+
 export function getCurrentUser(token) {
     return apiRequest('/auth/me', {
         method: 'GET',

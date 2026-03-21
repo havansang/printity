@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const { env } = require('../config/env');
@@ -19,6 +20,7 @@ function signAccessToken(user) {
       userId: user.id || user._id?.toString(),
       email: user.email,
       authProviders: user.authProviders,
+      sessionVersion: user.sessionVersion ?? 0,
     },
     env.JWT_SECRET,
     {
@@ -49,10 +51,29 @@ function extractBearerToken(authorizationHeader) {
   return token;
 }
 
+function generateNumericOtp(length = 6) {
+  const max = 10 ** length;
+  return crypto.randomInt(0, max).toString().padStart(length, '0');
+}
+
+function generateOpaqueToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+function hashSecretValue(namespace, value) {
+  return crypto
+    .createHmac('sha256', env.PASSWORD_RESET_SECRET || env.JWT_SECRET)
+    .update(`${namespace}:${value}`)
+    .digest('hex');
+}
+
 module.exports = {
   hashPassword,
   comparePassword,
   signAccessToken,
   verifyAccessToken,
   extractBearerToken,
+  generateNumericOtp,
+  generateOpaqueToken,
+  hashSecretValue,
 };

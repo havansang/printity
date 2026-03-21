@@ -21,8 +21,37 @@ const googleLoginSchema = z
   })
   .strict();
 
+const forgotPasswordRequestSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email'),
+  })
+  .strict();
+
+const verifyPasswordResetOtpSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email'),
+    otp: z.string().trim().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+  })
+  .strict();
+
+const resetPasswordSchema = z
+  .object({
+    email: z.string().trim().email('Invalid email'),
+    resetToken: z.string().trim().min(1, 'resetToken is required'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(8, 'Confirm password must be at least 8 characters'),
+  })
+  .strict()
+  .refine((value) => value.password === value.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
 module.exports = {
   registerSchema,
   loginSchema,
   googleLoginSchema,
+  forgotPasswordRequestSchema,
+  verifyPasswordResetOtpSchema,
+  resetPasswordSchema,
 };

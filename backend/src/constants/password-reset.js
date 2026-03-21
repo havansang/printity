@@ -1,0 +1,5 @@
+const PASSWORD_RESET_OTP_LENGTH = 6;
+
+module.exports = {
+  PASSWORD_RESET_OTP_LENGTH,
+};

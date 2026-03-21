@@ -19,6 +19,8 @@ Fields:
 - google.emailVerified: Boolean, default false
 - google.picture: String, trim
 - lastLoginAt: Date, default null
+- sessionVersion: Number, default 0
+- passwordChangedAt: Date, default null
 - createdAt: Date, auto by timestamps
 - updatedAt: Date, auto by timestamps
 
@@ -26,12 +28,44 @@ Business rules:
 - Neu authProviders co "local" thi passwordHash bat buoc phai co
 - Neu authProviders co "google" thi google.googleId bat buoc phai co
 - authProviders duoc loai bo gia tri trung lap truoc khi validate
+- sessionVersion dung de vo hieu hoa toan bo JWT cu khi user doi password
 
 Indexes:
 - unique index: email
 - unique sparse index: google.googleId
 
-2. COLLECTION: templates
+2. COLLECTION: passwordresets
+Model: PasswordReset
+Muc dich:
+- Luu OTP reset password va trang thai resend/verify
+- Ho tro chong spam, chong brute force va reset token mot lan
+
+Fields:
+- email: String, required, unique, lowercase, trim
+- otpHash: String, default null
+- expiresAt: Date, default null
+- attempts: Number, default 0
+- sendHistory: [Date], default []
+- lastSentAt: Date, default null
+- lockedAt: Date, default null
+- consumedAt: Date, default null
+- resetTokenHash: String, default null
+- resetTokenExpiresAt: Date, default null
+- createdAt: Date, auto by timestamps
+- updatedAt: Date, auto by timestamps
+
+Business rules:
+- OTP la ma 6 so nhung duoc hash truoc khi luu DB
+- OTP het han sau 5 phut
+- 1 email chi gui toi da 1 OTP / 30s va max 5 OTP / 10 phut
+- Sai OTP toi da 5 lan thi lock, user phai resend ma moi
+- Khi verify dung, otpHash bi xoa va doi sang resetTokenHash de sang buoc doi mat khau
+- Sau khi reset password thanh cong, document PasswordReset bi xoa
+
+Indexes:
+- unique index: email
+
+3. COLLECTION: templates
 Model: Template
 Muc dich:
 - Luu product template de frontend render editor
@@ -73,7 +107,7 @@ Business rules:
 Indexes:
 - unique index: slug
 
-3. COLLECTION: projects
+4. COLLECTION: projects
 Model: Project
 Muc dich:
 - Luu editor state cua 1 thiet ke cua user
@@ -107,7 +141,7 @@ Indexes:
 - { userId: 1, productType: 1, updatedAt: -1 }
 - text index: name
 
-4. COLLECTION: assets
+5. COLLECTION: assets
 Model: Asset
 Muc dich:
 - Luu metadata file anh user upload de dua vao editor
@@ -134,14 +168,14 @@ Business rules:
 Indexes:
 - { userId: 1, createdAt: -1 }
 
-5. QUAN HE DU LIEU
+6. QUAN HE DU LIEU
 - 1 User co nhieu Project
 - 1 User co nhieu Asset
 - 1 Project thuoc 1 User
 - 1 Project tham chieu 1 Template
 - 1 Template thuoc 1 productType
 
-6. ENUMS DANG DUNG
+7. ENUMS DANG DUNG
 - authProviders: ["local", "google"]
 - productType: ["tshirt", "polo"]
 - surfaces: ["front", "back"]

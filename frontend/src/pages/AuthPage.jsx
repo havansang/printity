@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { navigate } from '../app/router';
 import AuthForm from '../features/auth/AuthForm';
+import ForgotPasswordFlow from '../features/auth/ForgotPasswordFlow';
 import { useAuth } from '../features/auth/AuthContext';
 import { getInitials } from '../shared/lib/formatters';
 
 function resolveMode(search) {
     const params = new URLSearchParams(search || '');
-    return params.get('mode') === 'register' ? 'register' : 'login';
+    const mode = params.get('mode');
+
+    if (mode === 'register' || mode === 'forgot-password') {
+        return mode;
+    }
+
+    return 'login';
 }
 
 function AuthLogo({ centered = false }) {
@@ -72,6 +79,56 @@ export default function AuthPage({ search }) {
                             {isAuthenticated && (
                                 <AuthSessionCard user={user} logout={logout} centered />
                             )}
+                        </div>
+                    </section>
+                </div>
+            </div>
+        );
+    }
+
+    if (mode === 'forgot-password') {
+        return (
+            <div className="page page-auth page-auth-login">
+                <div className="login-page-shell">
+                    <aside className="login-visual-panel">
+                        <img
+                            src="/login-studio-scene.svg"
+                            alt="Lifestyle product scene"
+                            className="login-visual-image"
+                        />
+                        <div className="login-visual-overlay" />
+                        <div className="login-visual-copy">
+                            <h1>
+                                <span>RESET FAST,</span>
+                                <span className="login-highlight">GET BACK</span>
+                                <span>TO WORK</span>
+                            </h1>
+                            <p>
+                                Recover access with a short OTP flow that keeps the experience
+                                private, fast and easy to trust.
+                            </p>
+                            <p>
+                                Verify your email, confirm the code, then choose a fresh password
+                                without leaving the auth experience.
+                            </p>
+                        </div>
+                    </aside>
+
+                    <section className="login-form-panel">
+                        <div className="login-form-chrome">
+                            <AuthLogo />
+                            <button
+                                type="button"
+                                className="auth-close-btn"
+                                onClick={() => navigate('/')}
+                                aria-label="Back to home"
+                            >
+                                <span aria-hidden="true">Ă—</span>
+                            </button>
+                        </div>
+
+                        <div className="login-form-panel-body">
+                            <ForgotPasswordFlow onModeChange={handleModeChange} />
                         </div>
                     </section>
                 </div>

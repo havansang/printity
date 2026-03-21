@@ -11,10 +11,14 @@ const requireAuth = asyncHandler(async (req, res, next) => {
   }
 
   const payload = verifyAccessToken(token);
-  const user = await User.findById(payload.userId).select('_id email displayName avatarUrl authProviders');
+  const user = await User.findById(payload.userId).select('_id email displayName avatarUrl authProviders sessionVersion');
 
   if (!user) {
     throw new ApiError(401, 'Authentication required');
+  }
+
+  if ((payload.sessionVersion ?? 0) !== (user.sessionVersion ?? 0)) {
+    throw new ApiError(401, 'Session expired. Please sign in again');
   }
 
   req.user = {

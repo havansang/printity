@@ -487,7 +487,7 @@ export default function AuthForm({ mode, onModeChange }) {
                     <button
                         type="button"
                         className="auth-inline-link auth-inline-link-center"
-                        onClick={() => setSocialNotice('Password reset can be added next when that flow is ready.')}
+                        onClick={() => onModeChange('forgot-password')}
                     >
                         Forgot password?
                     </button>

@@ -27,6 +27,30 @@ const googleLogin = asyncHandler(async (req, res) => {
   });
 });
 
+const requestPasswordResetOtp = asyncHandler(async (req, res) => {
+  const result = await authService.requestPasswordResetOtp(req.body);
+  sendSuccess(res, {
+    message: 'If this email exists, we’ve sent a verification code',
+    data: result,
+  });
+});
+
+const verifyPasswordResetOtp = asyncHandler(async (req, res) => {
+  const result = await authService.verifyPasswordResetOtp(req.body);
+  sendSuccess(res, {
+    message: 'OTP verified successfully',
+    data: result,
+  });
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+  sendSuccess(res, {
+    message: 'Password updated successfully',
+    data: result,
+  });
+});
+
 const getMe = asyncHandler(async (req, res) => {
   const user = await authService.getCurrentUser(req.user.userId);
   sendSuccess(res, {
@@ -46,6 +70,9 @@ module.exports = {
   register,
   login,
   googleLogin,
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetPassword,
   getMe,
   logout,
 };
