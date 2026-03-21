@@ -1,29 +1,27 @@
-# Sử dụng Node.js LTS image làm base image cho build
-FROM node:lts as build
+FROM node:lts AS base
 
-# Thiết lập thư mục làm việc trong container
 WORKDIR /app
 
-# Sao chép package.json và package-lock.json vào container
 COPY package*.json ./
-
-# Cài đặt các phụ thuộc cho frontend
 RUN npm install
 
-# Sao chép tất cả mã nguồn vào container
+FROM base AS dev
+
 COPY . .
 
-# Xây dựng ứng dụng React hoặc Vite
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+FROM base AS build
+
+COPY . .
 RUN npm run build
 
-# Sử dụng Nginx để phục vụ ứng dụng
-FROM nginx:alpine
+FROM nginx:alpine AS production
 
-# Sao chép các file build từ build container vào container Nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Mở port 80 để phục vụ frontend
 EXPOSE 80
 
-# Chạy Nginx
 CMD ["nginx", "-g", "daemon off;"]
