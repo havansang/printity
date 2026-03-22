@@ -5,6 +5,7 @@ const registerSchema = z
     email: z.string().trim().email('Invalid email'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     displayName: z.string().trim().min(1).max(100).optional(),
+    turnstileToken: z.string().trim().min(1, 'turnstileToken is required'),
   })
   .strict();
 
@@ -12,6 +13,7 @@ const loginSchema = z
   .object({
     email: z.string().trim().email('Invalid email'),
     password: z.string().min(1, 'Password is required'),
+    turnstileToken: z.string().trim().min(1, 'turnstileToken is required'),
   })
   .strict();
 
@@ -24,6 +26,7 @@ const googleLoginSchema = z
 const forgotPasswordRequestSchema = z
   .object({
     email: z.string().trim().email('Invalid email'),
+    turnstileToken: z.string().trim().min(1, 'turnstileToken is required'),
   })
   .strict();
 

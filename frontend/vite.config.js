@@ -19,11 +19,13 @@ function readBackendEnvValue(name) {
 }
 
 const googleClientId = globalThis.process?.env?.VITE_GOOGLE_CLIENT_ID || readBackendEnvValue('GOOGLE_CLIENT_ID')
+const turnstileSiteKey = globalThis.process?.env?.VITE_TURNSTILE_SITE_KEY || readBackendEnvValue('TURNSTILE_SITE_KEY')
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
+    'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(turnstileSiteKey),
   },
   plugins: [react()],
   server: {

@@ -29,6 +29,7 @@ Input:
 - body.email: string, bat buoc, email hop le
 - body.password: string, bat buoc, toi thieu 8 ky tu
 - body.displayName: string, tuy chon, 1-100 ky tu
+- body.turnstileToken: string, bat buoc, token Turnstile tu frontend
 Output:
 {
   "success": true,
@@ -50,6 +51,7 @@ Auth: Khong
 Input:
 - body.email: string, bat buoc, email hop le
 - body.password: string, bat buoc
+- body.turnstileToken: string, bat buoc, token Turnstile tu frontend
 Output:
 {
   "success": true,
@@ -90,6 +92,7 @@ POST /api/v1/auth/forgot-password/request-otp
 Auth: Khong
 Input:
 - body.email: string, bat buoc, email hop le
+- body.turnstileToken: string, bat buoc, token Turnstile tu frontend
 Output:
 {
   "success": true,
@@ -621,6 +624,7 @@ Output:
 
 6. GHI CHU DE FRONTEND GOI API
 - Tat ca API can auth deu dung header Authorization: Bearer <jwt>
+- Login/Register/Forgot-password request OTP deu can turnstileToken hop le
 - Project API chap nhan ca payload moi: surfaces.front/back.canvasJson
 - Project API cung chap nhan payload cu: frontCanvasJson va backCanvasJson
 - Upload asset dung multipart/form-data, field ten la file

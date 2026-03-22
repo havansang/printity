@@ -13,6 +13,8 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().trim().min(1).default('uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().positive().default(10),
   GOOGLE_CLIENT_ID: z.string().trim().optional().default(''),
+  TURNSTILE_SITE_KEY: z.string().trim().optional().default(''),
+  TURNSTILE_SECRET_KEY: z.string().trim().optional().default(''),
   PUBLIC_BASE_URL: z.string().trim().optional().default(''),
   SMTP_HOST: z.string().trim().default('smtp.gmail.com'),
   SMTP_PORT: z.coerce.number().int().positive().default(465),
@@ -51,6 +53,8 @@ if (!parsedEnv.success) {
 const env = {
   ...parsedEnv.data,
   GOOGLE_CLIENT_ID: parsedEnv.data.GOOGLE_CLIENT_ID || null,
+  TURNSTILE_SITE_KEY: parsedEnv.data.TURNSTILE_SITE_KEY || null,
+  TURNSTILE_SECRET_KEY: parsedEnv.data.TURNSTILE_SECRET_KEY || null,
   PUBLIC_BASE_URL: parsedEnv.data.PUBLIC_BASE_URL || null,
   SMTP_USER: parsedEnv.data.SMTP_USER || null,
   SMTP_PASSWORD: parsedEnv.data.SMTP_PASSWORD || null,

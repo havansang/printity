@@ -52,8 +52,6 @@ const passwordResetSchema = new mongoose.Schema(
   },
 );
 
-passwordResetSchema.index({ email: 1 }, { unique: true });
-
 const PasswordReset = mongoose.model('PasswordReset', passwordResetSchema);
 
 module.exports = PasswordReset;

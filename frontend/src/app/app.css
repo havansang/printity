@@ -1068,6 +1068,27 @@ body {
   font-weight: 700;
 }
 
+.turnstile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.turnstile-widget {
+  width: 100%;
+  line-height: 0;
+}
+
+.turnstile-widget > div {
+  width: 100% !important;
+}
+
+.turnstile-widget iframe {
+  display: block;
+  width: 100% !important;
+  max-width: 100%;
+}
+
 .social-auth-icon {
   display: inline-flex;
   align-items: center;

@@ -3,6 +3,8 @@ import { navigate } from '../../app/router';
 import { APP_CONFIG } from '../../shared/config/appConfig';
 import { useAuth } from './AuthContext';
 import { loadGoogleIdentityScript } from './googleIdentity';
+import TurnstileField from './TurnstileField';
+import { TURNSTILE_ACTIONS } from './turnstileActions';
 
 function validate(mode, formState) {
     const nextErrors = {};
@@ -117,48 +119,12 @@ function EyeIcon({ open }) {
     );
 }
 
-function CheckIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="auth-icon-svg auth-icon-svg-check">
-            <path
-                d="m6.5 12.5 3.4 3.4 7.6-8.4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
 function SocialButton({ icon, label, onClick, disabled = false }) {
     return (
         <button type="button" className="social-auth-btn" onClick={onClick} disabled={disabled}>
             <span className="social-auth-icon">{icon}</span>
             <span>{label}</span>
         </button>
-    );
-}
-
-function VerificationPlaceholder() {
-    return (
-        <div className="captcha-placeholder" aria-label="Verification placeholder">
-            <div className="captcha-placeholder-main">
-                <span className="captcha-status-icon">
-                    <CheckIcon />
-                </span>
-                <div className="captcha-copy">
-                    <strong>Verification ready</strong>
-                    <p>Secure check placeholder</p>
-                </div>
-            </div>
-
-            <div className="captcha-provider">
-                <strong>CLOUDFLARE</strong>
-                <small>Placeholder</small>
-            </div>
-        </div>
     );
 }
 
@@ -174,6 +140,8 @@ export default function AuthForm({ mode, onModeChange }) {
     const [socialNotice, setSocialNotice] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
     const [googleStatus, setGoogleStatus] = useState(
         APP_CONFIG.googleClientId ? 'loading' : 'unavailable'
     );
@@ -182,6 +150,7 @@ export default function AuthForm({ mode, onModeChange }) {
 
     const isRegisterMode = mode === 'register';
     const isGoogleConfigured = Boolean(APP_CONFIG.googleClientId);
+    const isTurnstileConfigured = Boolean(APP_CONFIG.turnstileSiteKey);
     const isBusy = isSubmitting || isGoogleSubmitting;
 
     useEffect(() => {
@@ -189,6 +158,8 @@ export default function AuthForm({ mode, onModeChange }) {
         setSubmitError('');
         setSocialNotice('');
         setIsGoogleSubmitting(false);
+        setTurnstileToken('');
+        setTurnstileResetSignal((value) => value + 1);
         setShowPassword(false);
         setFormState((previous) => ({
             email: previous.email,
@@ -356,6 +327,16 @@ export default function AuthForm({ mode, onModeChange }) {
             return;
         }
 
+        if (!isTurnstileConfigured) {
+            setSubmitError('Verification is unavailable right now. Please refresh and try again.');
+            return;
+        }
+
+        if (!turnstileToken) {
+            setSubmitError('Please complete the verification challenge.');
+            return;
+        }
+
         setIsSubmitting(true);
         setFieldErrors({});
 
@@ -364,11 +345,13 @@ export default function AuthForm({ mode, onModeChange }) {
                 await register({
                     email: formState.email.trim(),
                     password: formState.password,
+                    turnstileToken,
                 });
             } else {
                 await login({
                     email: formState.email.trim(),
                     password: formState.password,
+                    turnstileToken,
                 });
             }
 
@@ -377,6 +360,8 @@ export default function AuthForm({ mode, onModeChange }) {
             setFieldErrors(collectApiErrors(error));
             setSubmitError(error?.message || 'Unable to submit this form right now.');
         } finally {
+            setTurnstileToken('');
+            setTurnstileResetSignal((value) => value + 1);
             setIsSubmitting(false);
         }
     };
@@ -455,7 +440,11 @@ export default function AuthForm({ mode, onModeChange }) {
                     {fieldErrors.password && <small>{fieldErrors.password}</small>}
                 </label>
 
-                <VerificationPlaceholder />
+                <TurnstileField
+                    key={`${mode}-${turnstileResetSignal}`}
+                    action={isRegisterMode ? TURNSTILE_ACTIONS.register : TURNSTILE_ACTIONS.login}
+                    onTokenChange={setTurnstileToken}
+                />
 
                 {isRegisterMode && (
                     <label className="auth-checkbox-row">

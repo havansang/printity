@@ -1,8 +1,15 @@
 const { asyncHandler } = require('../../utils/asyncHandler');
 const { sendSuccess } = require('../../utils/response');
+const { TURNSTILE_ACTIONS } = require('../../constants/turnstile');
+const { getRequestIp, verifyTurnstileToken } = require('../../utils/turnstile');
 const authService = require('./auth.service');
 
 const register = asyncHandler(async (req, res) => {
+  await verifyTurnstileToken({
+    token: req.body.turnstileToken,
+    remoteIp: getRequestIp(req),
+    expectedAction: TURNSTILE_ACTIONS.register,
+  });
   const result = await authService.registerLocalUser(req.body);
   sendSuccess(res, {
     statusCode: 201,
@@ -12,6 +19,11 @@ const register = asyncHandler(async (req, res) => {
 });
 
 const login = asyncHandler(async (req, res) => {
+  await verifyTurnstileToken({
+    token: req.body.turnstileToken,
+    remoteIp: getRequestIp(req),
+    expectedAction: TURNSTILE_ACTIONS.login,
+  });
   const result = await authService.loginLocalUser(req.body);
   sendSuccess(res, {
     message: 'Login successful',
@@ -28,6 +40,11 @@ const googleLogin = asyncHandler(async (req, res) => {
 });
 
 const requestPasswordResetOtp = asyncHandler(async (req, res) => {
+  await verifyTurnstileToken({
+    token: req.body.turnstileToken,
+    remoteIp: getRequestIp(req),
+    expectedAction: TURNSTILE_ACTIONS.forgotPassword,
+  });
   const result = await authService.requestPasswordResetOtp(req.body);
   sendSuccess(res, {
     message: 'If this email exists, we’ve sent a verification code',

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { APP_CONFIG } from '../../shared/config/appConfig';
 import { requestPasswordResetOtp, resetPassword, verifyPasswordResetOtp } from './authApi';
+import TurnstileField from './TurnstileField';
+import { TURNSTILE_ACTIONS } from './turnstileActions';
 
 const OTP_LENGTH = 6;
 const GENERIC_EMAIL_MESSAGE = "If this email exists, we've sent a verification code.";
@@ -74,6 +77,8 @@ export default function ForgotPasswordFlow({ onModeChange }) {
     const [infoMessage, setInfoMessage] = useState('');
     const [countdown, setCountdown] = useState(0);
     const [pendingAction, setPendingAction] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
     const otpRefs = useRef([]);
 
     useEffect(() => {
@@ -120,10 +125,23 @@ export default function ForgotPasswordFlow({ onModeChange }) {
             return;
         }
 
+        if (!APP_CONFIG.turnstileSiteKey) {
+            setErrorMessage('Verification is unavailable right now. Please refresh and try again.');
+            return;
+        }
+
+        if (!turnstileToken) {
+            setErrorMessage('Please complete the verification challenge.');
+            return;
+        }
+
         setPendingAction('send');
 
         try {
-            const payload = await requestPasswordResetOtp({ email: email.trim() });
+            const payload = await requestPasswordResetOtp({
+                email: email.trim(),
+                turnstileToken,
+            });
             setStep('verify');
             setOtpDigits(Array(OTP_LENGTH).fill(''));
             setResetToken('');
@@ -133,6 +151,8 @@ export default function ForgotPasswordFlow({ onModeChange }) {
         } catch (error) {
             setErrorMessage(error?.message || 'Unable to send OTP right now.');
         } finally {
+            setTurnstileToken('');
+            setTurnstileResetSignal((value) => value + 1);
             setPendingAction('');
         }
     };
@@ -322,6 +342,12 @@ export default function ForgotPasswordFlow({ onModeChange }) {
                         onChange={(event) => setEmail(event.target.value)}
                     />
                 </label>
+
+                <TurnstileField
+                    key={`forgot-password-${turnstileResetSignal}`}
+                    action={TURNSTILE_ACTIONS.forgotPassword}
+                    onTokenChange={setTurnstileToken}
+                />
 
                 {errorMessage && <div className="auth-message auth-message-error">{errorMessage}</div>}
                 {infoMessage && <div className="auth-message auth-message-info">{infoMessage}</div>}
