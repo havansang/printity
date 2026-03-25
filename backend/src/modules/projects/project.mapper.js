@@ -1,3 +1,4 @@
+const { SURFACE_KEYS } = require('../../constants/product');
 const { mapTemplate } = require('../templates/template.service');
 
 function getId(value) {
@@ -24,6 +25,11 @@ function mapProjectSurface(surface) {
   return {
     canvasJson: surface?.canvasJson ?? null,
     previewImageUrl: surface?.previewImageUrl ?? null,
+    designCompositeUrl: surface?.designCompositeUrl ?? null,
+    designCompositeWidth: surface?.designCompositeWidth ?? null,
+    designCompositeHeight: surface?.designCompositeHeight ?? null,
+    renderStatus: surface?.renderStatus ?? 'idle',
+    renderHash: surface?.renderHash ?? null,
   };
 }
 
@@ -41,10 +47,7 @@ function mapProjectSummary(project) {
 }
 
 function mapProjectDetail(project) {
-  const surfaces = {
-    front: mapProjectSurface(project.surfaces?.front),
-    back: mapProjectSurface(project.surfaces?.back),
-  };
+  const surfaces = Object.fromEntries(SURFACE_KEYS.map((key) => [key, mapProjectSurface(project.surfaces?.[key])]));
 
   const template =
     project.templateId &&
@@ -60,12 +63,18 @@ function mapProjectDetail(project) {
     templateId: getId(project.templateId),
     template,
     productType: project.productType,
+    selection: project.selection ?? null,
+    renderOptions: project.renderOptions ?? null,
+    printPayloadRaw: project.printPayloadRaw ?? null,
+    printPayloadNormalized: project.printPayloadNormalized ?? null,
     surfaces,
     frontCanvasJson: surfaces.front.canvasJson,
     backCanvasJson: surfaces.back.canvasJson,
+    neckLabelInnerCanvasJson: surfaces.neckLabelInner.canvasJson,
     thumbnailUrl: project.thumbnailUrl ?? null,
     status: project.status,
     lastOpenedAt: project.lastOpenedAt ?? null,
+    lastRenderedAt: project.lastRenderedAt ?? null,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };

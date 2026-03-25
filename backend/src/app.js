@@ -2,6 +2,7 @@ const cors = require('cors');
 const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 
 const { env } = require('./config/env');
 const { errorMiddleware } = require('./middlewares/error.middleware');
@@ -40,6 +41,7 @@ if (env.NODE_ENV !== 'production') {
 }
 
 app.use('/uploads', express.static(getUploadRootAbsolutePath()));
+app.use('/mockups', express.static(path.resolve(process.cwd(), 'resources', 'mockups')));
 app.use('/api/v1', apiRoutes);
 
 app.use(notFoundMiddleware);

@@ -1,32 +1,49 @@
 const ApiError = require('../../utils/ApiError');
+const { SURFACE_KEYS } = require('../../constants/product');
 const Template = require('./template.model');
 
+function mapSurface(surface, key) {
+  if (!surface) {
+    return null;
+  }
+
+  return {
+    key: surface.key || key,
+    label: surface.label,
+    position: surface.position || (key === 'neckLabelInner' ? 'neck' : key),
+    domId: surface.domId || [],
+    sequence: surface.sequence ?? 0,
+    printable: surface.printable ?? true,
+    allowedDecorationMethods: surface.allowedDecorationMethods || [],
+    templateImageUrl: surface.templateImageUrl,
+    overlayImageUrl: surface.overlayImageUrl || null,
+    maskImageUrl: surface.maskImageUrl || null,
+    printArea: surface.printArea,
+    editor: surface.editor || null,
+    transformPolicy: surface.transformPolicy || null,
+    render: surface.render || null,
+  };
+}
+
 function mapTemplate(template) {
+  const surfaces = Object.fromEntries(
+    SURFACE_KEYS.map((key) => [key, mapSurface(template.surfaces?.[key], key)]).filter(([, surface]) => Boolean(surface)),
+  );
+
   return {
     id: template._id?.toString() || template.id,
     name: template.name,
     slug: template.slug,
     productType: template.productType,
     description: template.description || null,
+    version: template.version ?? 1,
+    providerRefs: template.providerRefs || null,
+    supportedSurfaces: template.supportedSurfaces || Object.keys(surfaces),
     thumbnailUrl: template.thumbnailUrl || null,
     isActive: template.isActive,
     sortOrder: template.sortOrder,
-    surfaces: {
-      front: {
-        label: template.surfaces.front.label,
-        templateImageUrl: template.surfaces.front.templateImageUrl,
-        overlayImageUrl: template.surfaces.front.overlayImageUrl || null,
-        maskImageUrl: template.surfaces.front.maskImageUrl || null,
-        printArea: template.surfaces.front.printArea,
-      },
-      back: {
-        label: template.surfaces.back.label,
-        templateImageUrl: template.surfaces.back.templateImageUrl,
-        overlayImageUrl: template.surfaces.back.overlayImageUrl || null,
-        maskImageUrl: template.surfaces.back.maskImageUrl || null,
-        printArea: template.surfaces.back.printArea,
-      },
-    },
+    surfaces,
+    defaultRenderOptions: template.defaultRenderOptions || null,
     createdAt: template.createdAt,
     updatedAt: template.updatedAt,
   };

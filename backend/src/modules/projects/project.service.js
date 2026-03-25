@@ -1,61 +1,77 @@
 const ApiError = require('../../utils/ApiError');
+const { SURFACE_KEYS } = require('../../constants/product');
 const { buildPagination } = require('../../utils/pagination');
 const { getActiveTemplateById } = require('../templates/template.service');
 const Project = require('./project.model');
 const { mapProjectDetail, mapProjectSummary } = require('./project.mapper');
 
+const SURFACE_MUTABLE_FIELDS = [
+  'canvasJson',
+  'previewImageUrl',
+  'designCompositeUrl',
+  'designCompositeWidth',
+  'designCompositeHeight',
+  'renderStatus',
+  'renderHash',
+];
+
+const LEGACY_CANVAS_FIELD_BY_SURFACE = {
+  front: 'frontCanvasJson',
+  back: 'backCanvasJson',
+  neckLabelInner: 'neckLabelInnerCanvasJson',
+};
+
 function hasOwnProperty(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
 }
 
+function cloneValue(value) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  return JSON.parse(JSON.stringify(value));
+}
+
 function createDefaultSurfaces() {
-  return {
-    front: {
-      canvasJson: null,
-      previewImageUrl: null,
-    },
-    back: {
-      canvasJson: null,
-      previewImageUrl: null,
-    },
-  };
+  return Object.fromEntries(
+    SURFACE_KEYS.map((key) => [
+      key,
+      {
+        canvasJson: null,
+        previewImageUrl: null,
+        designCompositeUrl: null,
+        designCompositeWidth: null,
+        designCompositeHeight: null,
+        renderStatus: 'idle',
+        renderHash: null,
+      },
+    ]),
+  );
 }
 
 function normalizeProjectPayload(payload = {}) {
   const normalized = {};
 
-  if (payload.surfaces?.front) {
-    normalized.front = {};
+  for (const key of SURFACE_KEYS) {
+    const surfacePayload = payload.surfaces?.[key];
 
-    if (hasOwnProperty(payload.surfaces.front, 'canvasJson')) {
-      normalized.front.canvasJson = payload.surfaces.front.canvasJson;
+    if (surfacePayload) {
+      normalized[key] = normalized[key] || {};
+
+      for (const field of SURFACE_MUTABLE_FIELDS) {
+        if (hasOwnProperty(surfacePayload, field)) {
+          normalized[key][field] = surfacePayload[field];
+        }
+      }
     }
 
-    if (hasOwnProperty(payload.surfaces.front, 'previewImageUrl')) {
-      normalized.front.previewImageUrl = payload.surfaces.front.previewImageUrl;
+    const legacyCanvasField = LEGACY_CANVAS_FIELD_BY_SURFACE[key];
+
+    if (hasOwnProperty(payload, legacyCanvasField)) {
+      normalized[key] = normalized[key] || {};
+      normalized[key].canvasJson = payload[legacyCanvasField];
     }
-  }
-
-  if (payload.surfaces?.back) {
-    normalized.back = {};
-
-    if (hasOwnProperty(payload.surfaces.back, 'canvasJson')) {
-      normalized.back.canvasJson = payload.surfaces.back.canvasJson;
-    }
-
-    if (hasOwnProperty(payload.surfaces.back, 'previewImageUrl')) {
-      normalized.back.previewImageUrl = payload.surfaces.back.previewImageUrl;
-    }
-  }
-
-  if (hasOwnProperty(payload, 'frontCanvasJson')) {
-    normalized.front = normalized.front || {};
-    normalized.front.canvasJson = payload.frontCanvasJson;
-  }
-
-  if (hasOwnProperty(payload, 'backCanvasJson')) {
-    normalized.back = normalized.back || {};
-    normalized.back.canvasJson = payload.backCanvasJson;
   }
 
   return normalized;
@@ -66,12 +82,10 @@ function buildInitialSurfaces(payload) {
   const normalized = normalizeProjectPayload(payload);
 
   for (const key of Object.keys(normalized)) {
-    if (hasOwnProperty(normalized[key], 'canvasJson')) {
-      surfaces[key].canvasJson = normalized[key].canvasJson;
-    }
-
-    if (hasOwnProperty(normalized[key], 'previewImageUrl')) {
-      surfaces[key].previewImageUrl = normalized[key].previewImageUrl;
+    for (const field of SURFACE_MUTABLE_FIELDS) {
+      if (hasOwnProperty(normalized[key], field)) {
+        surfaces[key][field] = normalized[key][field];
+      }
     }
   }
 
@@ -83,12 +97,10 @@ function buildSurfaceUpdateOperations(payload) {
   const update = {};
 
   for (const key of Object.keys(normalized)) {
-    if (hasOwnProperty(normalized[key], 'canvasJson')) {
-      update[`surfaces.${key}.canvasJson`] = normalized[key].canvasJson;
-    }
-
-    if (hasOwnProperty(normalized[key], 'previewImageUrl')) {
-      update[`surfaces.${key}.previewImageUrl`] = normalized[key].previewImageUrl;
+    for (const field of SURFACE_MUTABLE_FIELDS) {
+      if (hasOwnProperty(normalized[key], field)) {
+        update[`surfaces.${key}.${field}`] = normalized[key][field];
+      }
     }
   }
 
@@ -137,10 +149,15 @@ async function createProject(userId, payload) {
     name: payload.name,
     templateId: template._id,
     productType: template.productType,
+    selection: hasOwnProperty(payload, 'selection') ? payload.selection : null,
+    renderOptions: hasOwnProperty(payload, 'renderOptions') ? payload.renderOptions : null,
+    printPayloadRaw: hasOwnProperty(payload, 'printPayloadRaw') ? payload.printPayloadRaw : null,
+    printPayloadNormalized: hasOwnProperty(payload, 'printPayloadNormalized') ? payload.printPayloadNormalized : null,
     surfaces: buildInitialSurfaces(payload),
     thumbnailUrl: hasOwnProperty(payload, 'thumbnailUrl') ? payload.thumbnailUrl : null,
     status: 'draft',
     lastOpenedAt: new Date(),
+    lastRenderedAt: hasOwnProperty(payload, 'lastRenderedAt') ? payload.lastRenderedAt : null,
   });
 
   await project.populate('templateId');
@@ -177,8 +194,32 @@ async function updateProject(userId, projectId, payload) {
     update.status = payload.status;
   }
 
+  if (hasOwnProperty(payload, 'selection')) {
+    update.selection = payload.selection;
+  }
+
+  if (hasOwnProperty(payload, 'renderOptions')) {
+    update.renderOptions = payload.renderOptions;
+  }
+
+  if (hasOwnProperty(payload, 'printPayloadRaw')) {
+    update.printPayloadRaw = payload.printPayloadRaw;
+  }
+
+  if (hasOwnProperty(payload, 'printPayloadNormalized')) {
+    update.printPayloadNormalized = payload.printPayloadNormalized;
+  }
+
   if (hasOwnProperty(payload, 'thumbnailUrl')) {
     update.thumbnailUrl = payload.thumbnailUrl;
+  }
+
+  if (hasOwnProperty(payload, 'lastOpenedAt')) {
+    update.lastOpenedAt = payload.lastOpenedAt;
+  }
+
+  if (hasOwnProperty(payload, 'lastRenderedAt')) {
+    update.lastRenderedAt = payload.lastRenderedAt;
   }
 
   if (hasOwnProperty(payload, 'templateId')) {
@@ -215,8 +256,28 @@ async function autosaveProject(userId, projectId, payload) {
     lastOpenedAt: payload.lastOpenedAt || new Date(),
   };
 
+  if (hasOwnProperty(payload, 'selection')) {
+    update.selection = payload.selection;
+  }
+
+  if (hasOwnProperty(payload, 'renderOptions')) {
+    update.renderOptions = payload.renderOptions;
+  }
+
+  if (hasOwnProperty(payload, 'printPayloadRaw')) {
+    update.printPayloadRaw = payload.printPayloadRaw;
+  }
+
+  if (hasOwnProperty(payload, 'printPayloadNormalized')) {
+    update.printPayloadNormalized = payload.printPayloadNormalized;
+  }
+
   if (hasOwnProperty(payload, 'thumbnailUrl')) {
     update.thumbnailUrl = payload.thumbnailUrl;
+  }
+
+  if (hasOwnProperty(payload, 'lastRenderedAt')) {
+    update.lastRenderedAt = payload.lastRenderedAt;
   }
 
   const updatedProject = await Project.findOneAndUpdate(
@@ -254,10 +315,15 @@ async function duplicateProject(userId, projectId) {
     name: `${project.name} Copy`,
     templateId: project.templateId,
     productType: project.productType,
-    surfaces: JSON.parse(JSON.stringify(project.surfaces)),
+    selection: cloneValue(project.selection),
+    renderOptions: cloneValue(project.renderOptions),
+    printPayloadRaw: cloneValue(project.printPayloadRaw),
+    printPayloadNormalized: cloneValue(project.printPayloadNormalized),
+    surfaces: cloneValue(project.surfaces),
     thumbnailUrl: project.thumbnailUrl,
     status: project.status,
     lastOpenedAt: new Date(),
+    lastRenderedAt: project.lastRenderedAt,
   });
 
   await duplicate.populate('templateId');
