@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed:templates": "node scripts/seed-templates.js"
+    "seed:templates": "node scripts/seed-templates.js",
+    "sync:fonts": "node scripts/sync-fonts.js"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +25,8 @@
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.3",
+    "sharp": "^0.34.5",
+    "text-to-svg": "^3.1.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

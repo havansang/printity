@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 900" width="800" height="900">
+  <defs>
+    <linearGradient id="shirtGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c8c8c8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b0b0b0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sleeveLeftB" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#b8b8b8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a0a0a0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sleeveRightB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#b8b8b8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a0a0a0;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadowB" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.15)" />
+    </filter>
+  </defs>
+
+  <!-- Main shirt body (back - slightly flatter collar) -->
+  <path d="
+    M 220 120
+    C 270 110, 310 95, 340 70
+    C 360 50, 390 38, 400 35
+    C 410 38, 440 50, 460 70
+    C 490 95, 530 110, 580 120
+    L 680 180
+    L 680 320
+    L 580 280
+    L 580 860
+    L 220 860
+    L 220 280
+    L 120 320
+    L 120 180
+    Z
+  " fill="url(#shirtGradB)" stroke="#999999" stroke-width="1.5" filter="url(#shadowB)" />
+
+  <!-- Left sleeve -->
+  <path d="M 220 120 L 120 180 L 120 320 L 220 280 Z" fill="url(#sleeveLeftB)" stroke="#999999" stroke-width="1" />
+
+  <!-- Right sleeve -->
+  <path d="M 580 120 L 680 180 L 680 320 L 580 280 Z" fill="url(#sleeveRightB)" stroke="#999999" stroke-width="1" />
+
+  <!-- Back collar (simple curved neckline) -->
+  <path d="
+    M 220 120
+    C 280 118, 340 115, 400 118
+    C 460 115, 520 118, 580 120
+    C 540 118, 460 122, 400 120
+    C 340 122, 260 118, 220 120
+    Z
+  " fill="#b5b5b5" stroke="#999999" stroke-width="1" />
+
+  <!-- Back neck seam -->
+  <line x1="400" y1="35" x2="400" y2="120" stroke="#999999" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" />
+
+  <!-- Center back seam -->
+  <line x1="400" y1="120" x2="400" y2="860" stroke="#999999" stroke-width="1" stroke-dasharray="6,4" opacity="0.3" />
+
+  <!-- Side seams -->
+  <line x1="220" y1="280" x2="220" y2="860" stroke="#999999" stroke-width="1" opacity="0.5" />
+  <line x1="580" y1="280" x2="580" y2="860" stroke="#999999" stroke-width="1" opacity="0.5" />
+
+  <!-- Bottom hem -->
+  <line x1="220" y1="850" x2="580" y2="850" stroke="#999999" stroke-width="2" opacity="0.6" />
+
+  <!-- Label tag indicator at back neck -->
+  <rect x="380" y="122" width="40" height="24" rx="2" fill="#cccccc" stroke="#aaaaaa" stroke-width="1" opacity="0.7" />
+  <text x="400" y="138" text-anchor="middle" font-size="9" fill="#888888" font-family="Arial">BACK</text>
+</svg>
