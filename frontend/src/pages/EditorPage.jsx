@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { navigate } from '../app/router';
 import EditorLayout from '../editor/layout/EditorLayout';
-import { fetchTemplate } from '../features/home/homeApi';
+import { useAuth } from '../features/auth/AuthContext';
+import { fetchProject, fetchTemplate } from '../features/home/homeApi';
 import { resolveRenderableAssetUrl } from '../shared/lib/assetUrls';
 import { templates } from '../templates/templates';
 
@@ -85,22 +86,45 @@ function TemplateErrorState({ message }) {
 }
 
 export default function EditorPage({ search }) {
-    const templateId = useMemo(() => {
+    const { isAuthenticated, isInitializing, token } = useAuth();
+    const { projectId, templateId } = useMemo(() => {
         const params = new URLSearchParams(search || '');
-        return params.get('templateId') || '';
+        return {
+            projectId: params.get('projectId') || '',
+            templateId: params.get('templateId') || '',
+        };
     }, [search]);
 
     const [templateDef, setTemplateDef] = useState(() => (
-        templateId ? null : DEFAULT_TEMPLATE_DEF
+        projectId || templateId ? null : DEFAULT_TEMPLATE_DEF
     ));
-    const [isLoading, setIsLoading] = useState(Boolean(templateId));
+    const [project, setProject] = useState(null);
+    const [isLoading, setIsLoading] = useState(Boolean(projectId || templateId));
     const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        if (projectId && !isInitializing && !isAuthenticated) {
+            navigate('/auth?mode=login', { replace: true });
+        }
+    }, [isAuthenticated, isInitializing, projectId]);
 
     useEffect(() => {
         let isCancelled = false;
 
-        if (!templateId) {
+        if (projectId && !token) {
+            if (isInitializing) {
+                return undefined;
+            }
+            setTemplateDef(null);
+            setProject(null);
+            setErrorMessage('Sign in to reopen this saved project.');
+            setIsLoading(false);
+            return undefined;
+        }
+
+        if (!projectId && !templateId) {
             setTemplateDef(DEFAULT_TEMPLATE_DEF);
+            setProject(null);
             setErrorMessage('');
             setIsLoading(false);
             return undefined;
@@ -109,18 +133,38 @@ export default function EditorPage({ search }) {
         setIsLoading(true);
         setErrorMessage('');
 
-        fetchTemplate(templateId)
+        const request = projectId
+            ? fetchProject(token, projectId)
+            : fetchTemplate(templateId);
+
+        request
             .then((payload) => {
                 if (isCancelled) return;
+
+                if (projectId) {
+                    const nextProject = payload?.data?.project || null;
+                    const nextTemplateDef = buildEditorTemplateDefinition(nextProject?.template);
+                    if (!nextTemplateDef) {
+                        throw new Error('The saved project has no supported editor surfaces.');
+                    }
+
+                    setProject(nextProject);
+                    setTemplateDef(nextTemplateDef);
+                    return;
+                }
+
                 const nextTemplateDef = buildEditorTemplateDefinition(payload?.data?.template);
                 if (!nextTemplateDef) {
                     throw new Error('The selected template has no supported editor surfaces.');
                 }
+
+                setProject(null);
                 setTemplateDef(nextTemplateDef);
             })
             .catch((error) => {
                 if (isCancelled) return;
                 setTemplateDef(null);
+                setProject(null);
                 setErrorMessage(error?.message || 'Unable to load this template.');
             })
             .finally(() => {
@@ -130,10 +174,10 @@ export default function EditorPage({ search }) {
         return () => {
             isCancelled = true;
         };
-    }, [templateId]);
+    }, [isInitializing, projectId, templateId, token]);
 
     if (isLoading) {
-        return <RouteLoadingState message="Loading template editor..." />;
+        return <RouteLoadingState message={projectId ? 'Loading saved project...' : 'Loading template editor...'} />;
     }
 
     if (errorMessage || !templateDef) {
@@ -142,8 +186,9 @@ export default function EditorPage({ search }) {
 
     return (
         <EditorLayout
-            key={templateDef.id || templateDef.templateKey || templateDef.slug || DEFAULT_TEMPLATE_KEY}
+            key={project?.id || templateDef.id || templateDef.templateKey || templateDef.slug || DEFAULT_TEMPLATE_KEY}
             templateDef={templateDef}
+            initialProject={project}
         />
     );
 }

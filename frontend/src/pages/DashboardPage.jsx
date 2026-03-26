@@ -23,8 +23,19 @@ function buildDashboardUrl(tab) {
     return `/dashboard?tab=${encodeURIComponent(tab)}`;
 }
 
-function buildEditorUrl(templateId) {
-    return templateId ? `/editor?templateId=${encodeURIComponent(templateId)}` : '/editor';
+function buildEditorUrl(templateId, projectId) {
+    const params = new URLSearchParams();
+
+    if (projectId) {
+        params.set('projectId', projectId);
+    }
+
+    if (templateId) {
+        params.set('templateId', templateId);
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/editor?${queryString}` : '/editor';
 }
 
 function getTemplatePreview(template) {
@@ -241,7 +252,7 @@ function ProductsView({ projects, projectsLoading, projectsError }) {
                         <button
                             type="button"
                             className="ghost-action ghost-action-inline"
-                            onClick={() => navigate(buildEditorUrl(project.templateId))}
+                            onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
                         >
                             Resume in studio
                         </button>

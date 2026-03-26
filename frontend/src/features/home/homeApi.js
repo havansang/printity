@@ -34,9 +34,24 @@ export function fetchProjects(token, {
     });
 }
 
+export function fetchProject(token, projectId) {
+    return apiRequest(`/projects/${projectId}`, {
+        method: 'GET',
+        token,
+    });
+}
+
 export function createProject(token, body) {
     return apiRequest('/projects', {
         method: 'POST',
+        token,
+        body,
+    });
+}
+
+export function updateProject(token, projectId, body) {
+    return apiRequest(`/projects/${projectId}`, {
+        method: 'PUT',
         token,
         body,
     });

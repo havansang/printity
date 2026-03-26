@@ -4,7 +4,7 @@ import {
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
 import { navigate } from '../../app/router';
 import { useAuth } from '../../features/auth/AuthContext';
-import { createProject } from '../../features/home/homeApi';
+import { createProject, updateProject } from '../../features/home/homeApi';
 import { fetchProductColors } from '../../shared/api/colorsApi';
 import { fetchBackendFonts } from '../../shared/api/fontsApi';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
@@ -45,6 +45,19 @@ function createSurfaceMap(surfaceKeys, createValue) {
     return Object.fromEntries(surfaceKeys.map((surfaceKey) => [surfaceKey, createValue(surfaceKey)]));
 }
 
+function normalizePrintArea(area) {
+    if (!area || typeof area !== 'object') {
+        return cloneSerializable(DEFAULT_PRINT_AREA);
+    }
+
+    return {
+        x: Number(area.x) || 0,
+        y: Number(area.y) || 0,
+        width: Number(area.width) || DEFAULT_PRINT_AREA.width,
+        height: Number(area.height) || DEFAULT_PRINT_AREA.height,
+    };
+}
+
 function snapshotHasObjects(snapshot) {
     return Array.isArray(snapshot?.objects) && snapshot.objects.length > 0;
 }
@@ -61,6 +74,19 @@ function formatProjectTimestamp(date = new Date()) {
 function buildProjectName(templateDef) {
     const baseName = String(templateDef?.name || templateDef?.productType || 'Product').trim() || 'Product';
     return `${baseName} ${formatProjectTimestamp()}`.slice(0, 100);
+}
+
+function getInitialProjectSurfaceSnapshots(initialProject, surfaceKeys) {
+    return createSurfaceMap(
+        surfaceKeys,
+        (surfaceKey) => cloneSerializable(initialProject?.surfaces?.[surfaceKey]?.canvasJson || null)
+    );
+}
+
+function getInitialProjectPrintAreas(initialProject, surfaceKeys) {
+    return createSurfaceMap(surfaceKeys, (surfaceKey) => (
+        normalizePrintArea(initialProject?.printPayloadRaw?.printAreas?.[surfaceKey])
+    ));
 }
 
 /* ── Color palette from spec ──────────────────────────────── */
@@ -109,7 +135,7 @@ function normalizeShirtColors(items) {
     return normalized.length > 0 ? normalized : DEFAULT_SHIRT_COLORS;
 }
 
-export function EditorProvider({ children, templateDef: providedTemplateDef }) {
+export function EditorProvider({ children, templateDef: providedTemplateDef, initialProject = null }) {
     const { token } = useAuth();
     const canvasRef = useRef(null);
     const [layers, setLayers] = useState([]);
@@ -120,20 +146,27 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
     const templateDef = providedTemplateDef || DEFAULT_TEMPLATE_DEF;
     const surfaceDefs = getTemplateSurfaces(templateDef);
     const surfaceKeys = surfaceDefs.map((surface) => surface.key);
-    const defaultSurface = surfaceKeys[0] || 'front';
+    const initialSurface = surfaceKeys.includes(initialProject?.printPayloadRaw?.activeSurface)
+        ? initialProject.printPayloadRaw.activeSurface
+        : (surfaceKeys[0] || 'front');
+    const initialProjectId = String(initialProject?.id || '').trim();
+    const initialProjectName = String(initialProject?.name || '').trim();
+    const initialShirtColor = normalizeShirtColorHex(
+        initialProject?.selection?.colorHex || initialProject?.printPayloadRaw?.shirtColor
+    ) || DEFAULT_SHIRT_COLOR_HEX;
+    const initialSurfaceSnapshots = getInitialProjectSurfaceSnapshots(initialProject, surfaceKeys);
+    const initialSurfacePrintAreas = getInitialProjectPrintAreas(initialProject, surfaceKeys);
 
     /* ---------- multi-surface ---------------------------------------- */
-    const [activeSurface, setActiveSurface] = useState(defaultSurface);
-    const activeSurfaceRef = useRef(defaultSurface);
-    const surfaceDataRef = useRef(createSurfaceMap(surfaceKeys, () => null));
+    const [activeSurface, setActiveSurface] = useState(initialSurface);
+    const activeSurfaceRef = useRef(initialSurface);
+    const surfaceDataRef = useRef(initialSurfaceSnapshots);
 
-    const [shirtColor, setShirtColor] = useState(DEFAULT_SHIRT_COLOR_HEX);
+    const [shirtColor, setShirtColor] = useState(initialShirtColor);
     const [shirtColors, setShirtColors] = useState(DEFAULT_SHIRT_COLORS);
     const [shirtColorsLoading, setShirtColorsLoading] = useState(true);
     const [shirtColorsError, setShirtColorsError] = useState('');
-    const [surfacePrintAreas, setSurfacePrintAreas] = useState(
-        createSurfaceMap(surfaceKeys, () => cloneSerializable(DEFAULT_PRINT_AREA))
-    );
+    const [surfacePrintAreas, setSurfacePrintAreas] = useState(initialSurfacePrintAreas);
 
     /* ---------- history ---------------------------------------------- */
     const historyRef = useRef(createSurfaceMap(surfaceKeys, () => ({ stack: [], pointer: -1 })));
@@ -617,8 +650,9 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         if (selectedColor?.key) selection.colorKey = selectedColor.key;
         if (selectedColor?.label) selection.colorLabel = selectedColor.label;
         if (selectedColor?.hex || shirtColor) selection.colorHex = selectedColor?.hex || shirtColor;
+        const nextProjectName = initialProjectName || buildProjectName(templateDef);
         const payload = {
-            name: buildProjectName(templateDef),
+            name: nextProjectName,
             templateId,
             surfaces: Object.fromEntries(
                 surfaceKeys.map((surfaceKey) => [surfaceKey, {
@@ -646,11 +680,15 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         setIsSavingProduct(true);
 
         try {
-            const response = await createProject(token, payload);
+            const response = initialProjectId
+                ? await updateProject(token, initialProjectId, payload)
+                : await createProject(token, payload);
             navigate('/dashboard?tab=products');
             return {
                 ok: true,
-                message: response?.message || 'Project created successfully',
+                message: response?.message || (
+                    initialProjectId ? 'Project updated successfully' : 'Project created successfully'
+                ),
                 project: response?.data?.project || null,
             };
         } catch (error) {
@@ -666,6 +704,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
     }, [
         captureSurfaceSnapshots,
         isSavingProduct,
+        initialProjectId,
+        initialProjectName,
         shirtColor,
         shirtColors,
         surfaceKeys,

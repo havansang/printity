@@ -8,9 +8,9 @@ import BottomToolbar from './BottomToolbar';
 import PreviewWorkspace from './PreviewWorkspace';
 import './editor.css';
 
-export default function EditorLayout({ templateDef }) {
+export default function EditorLayout({ templateDef, initialProject = null }) {
     return (
-        <EditorProvider templateDef={templateDef}>
+        <EditorProvider templateDef={templateDef} initialProject={initialProject}>
             <EditorShell />
         </EditorProvider>
     );
