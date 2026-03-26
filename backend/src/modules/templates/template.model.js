@@ -367,7 +367,9 @@ templateSchema.pre('validate', function normalizeTemplateSurfaces(next) {
     this.supportedSurfaces = existingSurfaceKeys;
   }
 
-  next();
+  if (typeof next === 'function') {
+    return next();
+  }
 });
 
 const Template = mongoose.model('Template', templateSchema);

@@ -19,6 +19,8 @@ export default function PreviewWorkspace() {
         surfaceDefs,
         surfacePrintAreas,
         captureSurfaceSnapshots,
+        hasDesignContent,
+        isSavingProduct,
         saveProduct,
         templateDef,
     } = useEditor();
@@ -119,15 +121,12 @@ export default function PreviewWorkspace() {
         }
     };
 
-    const handleSaveProduct = () => {
-        const result = saveProduct();
-        if (result?.ok) {
-            const savedAt = new Date(result.payload.savedAt).toLocaleString();
-            setSaveMessage(`Saved locally at ${savedAt}`);
-            return;
+    const handleSaveProduct = async () => {
+        setSaveMessage('');
+        const result = await saveProduct();
+        if (!result?.ok) {
+            setSaveMessage(result?.message || 'Save failed. Please try again.');
         }
-
-        setSaveMessage('Save failed. Check browser storage availability.');
     };
 
     return (
@@ -203,9 +202,13 @@ export default function PreviewWorkspace() {
                 </div>
 
                 <div className="preview-footer-right">
-                    <button className="preview-footer-btn preview-footer-save" onClick={handleSaveProduct}>
+                    <button
+                        className="preview-footer-btn preview-footer-save"
+                        onClick={handleSaveProduct}
+                        disabled={!hasDesignContent || isSavingProduct}
+                    >
                         <SaveIcon />
-                        Save Product
+                        {isSavingProduct ? 'Saving product...' : 'Save Product'}
                     </button>
                 </div>
             </div>

@@ -2,6 +2,9 @@ import {
     createContext, useContext, useCallback, useRef, useState, useEffect,
 } from 'react';
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
+import { navigate } from '../../app/router';
+import { useAuth } from '../../features/auth/AuthContext';
+import { createProject } from '../../features/home/homeApi';
 import { fetchProductColors } from '../../shared/api/colorsApi';
 import { fetchBackendFonts } from '../../shared/api/fontsApi';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
@@ -27,7 +30,7 @@ const SCENE_ZOOM_STEP = 1.1;
 
 const DEFAULT_TEMPLATE_KEY = 'tshirt';
 const DEFAULT_TEMPLATE_DEF = templates[DEFAULT_TEMPLATE_KEY] || {};
-const PRODUCT_DRAFT_STORAGE_KEY = 'printity.productDraft';
+const BACKEND_TEMPLATE_ID_PATTERN = /^[a-f\d]{24}$/i;
 const DEFAULT_SHIRT_COLOR_HEX = '#FFFFFF';
 
 const EditorContext = createContext(null);
@@ -40,6 +43,24 @@ function cloneSerializable(value) {
 
 function createSurfaceMap(surfaceKeys, createValue) {
     return Object.fromEntries(surfaceKeys.map((surfaceKey) => [surfaceKey, createValue(surfaceKey)]));
+}
+
+function snapshotHasObjects(snapshot) {
+    return Array.isArray(snapshot?.objects) && snapshot.objects.length > 0;
+}
+
+function formatProjectTimestamp(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function buildProjectName(templateDef) {
+    const baseName = String(templateDef?.name || templateDef?.productType || 'Product').trim() || 'Product';
+    return `${baseName} ${formatProjectTimestamp()}`.slice(0, 100);
 }
 
 /* ── Color palette from spec ──────────────────────────────── */
@@ -89,6 +110,7 @@ function normalizeShirtColors(items) {
 }
 
 export function EditorProvider({ children, templateDef: providedTemplateDef }) {
+    const { token } = useAuth();
     const canvasRef = useRef(null);
     const [layers, setLayers] = useState([]);
     const [selectedLayerId, setSelectedLayerId] = useState(null);
@@ -136,6 +158,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
 
     /* ---------- preview mode ---------------------------------------- */
     const [isPreviewMode, setIsPreviewMode] = useState(false);
+    const [hasDesignContent, setHasDesignContent] = useState(false);
+    const [isSavingProduct, setIsSavingProduct] = useState(false);
 
     /* ---------- canvas interaction mode ----------------------------- */
     const [isPanMode, setIsPanMode] = useState(false);
@@ -366,6 +390,24 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         setCanRedo(h.pointer < h.stack.length - 1);
     }, [activeSurface]);
 
+    const refreshHasDesignContent = useCallback(() => {
+        const canvas = canvasRef.current;
+        const currentSurface = activeSurfaceRef.current;
+        const currentSurfaceHasObjects = Boolean(
+            canvas
+            && !canvas.disposed
+            && !canvas.destroyed
+            && canvas.getObjects().length > 0
+        );
+        const nextHasDesignContent = surfaceKeys.some((surfaceKey) => (
+            surfaceKey === currentSurface
+                ? currentSurfaceHasObjects
+                : snapshotHasObjects(surfaceDataRef.current[surfaceKey])
+        ));
+        setHasDesignContent(nextHasDesignContent);
+        return nextHasDesignContent;
+    }, [surfaceKeys]);
+
     const syncLayers = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -385,7 +427,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
             return { id: obj._layerId, name, type };
         });
         setLayers(nextLayers);
-    }, []);
+        refreshHasDesignContent();
+    }, [refreshHasDesignContent]);
 
     const _readTextStyle = useCallback((obj) => {
         if (!obj || !(obj instanceof IText)) {
@@ -486,8 +529,13 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         const snapshot = canvas.toJSON(CUSTOM_PROPS);
         autoSaveTimer.current = setTimeout(() => {
             surfaceDataRef.current[surface] = snapshot;
+            setHasDesignContent(surfaceKeys.some((surfaceKey) => (
+                surfaceKey === surface
+                    ? snapshotHasObjects(snapshot)
+                    : snapshotHasObjects(surfaceDataRef.current[surfaceKey])
+            )));
         }, AUTO_SAVE_DELAY);
-    }, []);
+    }, [surfaceKeys]);
 
     const captureSurfaceSnapshots = useCallback(() => {
         const canvas = canvasRef.current;
@@ -503,13 +551,22 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
             surfaceDataRef.current[surface] = canvas.toJSON(CUSTOM_PROPS);
         }
 
-        return createSurfaceMap(surfaceKeys, (surfaceKey) => cloneSerializable(surfaceDataRef.current[surfaceKey]));
+        const snapshots = createSurfaceMap(
+            surfaceKeys,
+            (surfaceKey) => cloneSerializable(surfaceDataRef.current[surfaceKey])
+        );
+
+        setHasDesignContent(surfaceKeys.some((surfaceKey) => snapshotHasObjects(snapshots[surfaceKey])));
+        return snapshots;
     }, [surfaceKeys]);
 
     const restoreCurrentSurface = useCallback(async (canvas) => {
         const targetCanvas = canvas || canvasRef.current;
         const snapshot = surfaceDataRef.current[activeSurfaceRef.current];
-        if (!targetCanvas || !snapshot) return false;
+        if (!targetCanvas || !snapshot) {
+            refreshHasDesignContent();
+            return false;
+        }
 
         _isRestoringHistory.current = true;
         await targetCanvas.loadFromJSON(cloneSerializable(snapshot));
@@ -518,30 +575,104 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         _isRestoringHistory.current = false;
         syncLayers();
         _refreshUndoRedo();
+        refreshHasDesignContent();
         return true;
-    }, [_refreshUndoRedo, ensureCanvasTextFonts, syncLayers]);
+    }, [_refreshUndoRedo, ensureCanvasTextFonts, refreshHasDesignContent, syncLayers]);
 
-    const saveProduct = useCallback(() => {
+    const saveProduct = useCallback(async () => {
+        if (isSavingProduct) {
+            return {
+                ok: false,
+                message: 'A save is already in progress. Please wait a moment.',
+            };
+        }
+
+        const templateId = String(templateDef?.id || '').trim();
+        if (!BACKEND_TEMPLATE_ID_PATTERN.test(templateId)) {
+            return {
+                ok: false,
+                message: 'This editor session is not linked to a savable backend template.',
+            };
+        }
+
+        if (!token) {
+            return {
+                ok: false,
+                message: 'You need to sign in again before saving this product.',
+            };
+        }
+
+        const snapshots = captureSurfaceSnapshots();
+        const hasAnyDesign = surfaceKeys.some((surfaceKey) => snapshotHasObjects(snapshots[surfaceKey]));
+        if (!hasAnyDesign) {
+            return {
+                ok: false,
+                message: 'Add at least one design element before saving this product.',
+            };
+        }
+
+        const selectedColor = shirtColors.find((color) => color.hex === shirtColor) || null;
+        const now = new Date();
+        const selection = {};
+        if (selectedColor?.key) selection.colorKey = selectedColor.key;
+        if (selectedColor?.label) selection.colorLabel = selectedColor.label;
+        if (selectedColor?.hex || shirtColor) selection.colorHex = selectedColor?.hex || shirtColor;
         const payload = {
-            templateId: templateDef.id || null,
-            templateKey: templateDef.templateKey || templateDef.slug || DEFAULT_TEMPLATE_KEY,
-            templateName: templateDef.name || null,
-            productType: templateDef.productType || DEFAULT_TEMPLATE_KEY,
-            savedAt: new Date().toISOString(),
-            shirtColor,
-            activeSurface: activeSurfaceRef.current,
-            printAreas: cloneSerializable(surfacePrintAreas),
-            surfaces: captureSurfaceSnapshots(),
+            name: buildProjectName(templateDef),
+            templateId,
+            surfaces: Object.fromEntries(
+                surfaceKeys.map((surfaceKey) => [surfaceKey, {
+                    canvasJson: snapshots[surfaceKey] || null,
+                }])
+            ),
+            selection: Object.keys(selection).length > 0 ? selection : null,
+            renderOptions: cloneSerializable(templateDef?.defaultRenderOptions || null),
+            printPayloadRaw: {
+                shirtColor,
+                activeSurface: activeSurfaceRef.current,
+                printAreas: cloneSerializable(surfacePrintAreas),
+                surfaces: snapshots,
+            },
+            printPayloadNormalized: {
+                templateId,
+                productType: templateDef?.productType || DEFAULT_TEMPLATE_KEY,
+                supportedSurfaces: [...surfaceKeys],
+                activeSurface: activeSurfaceRef.current,
+                shirtColor,
+            },
+            lastRenderedAt: now.toISOString(),
         };
 
+        setIsSavingProduct(true);
+
         try {
-            window.localStorage.setItem(PRODUCT_DRAFT_STORAGE_KEY, JSON.stringify(payload));
-            return { ok: true, storageKey: PRODUCT_DRAFT_STORAGE_KEY, payload };
+            const response = await createProject(token, payload);
+            navigate('/dashboard?tab=products');
+            return {
+                ok: true,
+                message: response?.message || 'Project created successfully',
+                project: response?.data?.project || null,
+            };
         } catch (error) {
-            console.error('Failed to save product draft', error);
-            return { ok: false, error, payload };
+            console.error('Failed to save project', error);
+            return {
+                ok: false,
+                error,
+                message: error?.message || 'Unable to save this product right now.',
+            };
+        } finally {
+            setIsSavingProduct(false);
         }
-    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas, templateDef]);
+    }, [
+        captureSurfaceSnapshots,
+        isSavingProduct,
+        shirtColor,
+        shirtColors,
+        surfaceKeys,
+        surfacePrintAreas,
+        templateDef,
+        token,
+    ]);
 
     const enterPreviewMode = useCallback(() => {
         captureSurfaceSnapshots();
@@ -611,7 +742,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         /* ── pan mode mouse hooks (attached once) ── */
         ensureCanvasTextFonts(canvas);
         if (!surfaceDataRef.current[activeSurfaceRef.current]) syncLayers();
-    }, [ensureCanvasTextFonts, syncLayers, _constrainObject, _triggerAutoSave]);
+        refreshHasDesignContent();
+    }, [ensureCanvasTextFonts, refreshHasDesignContent, syncLayers, _constrainObject, _triggerAutoSave]);
 
     /* ── pan mode toggle ─────────────────────────────────────────── */
     const togglePanMode = useCallback((active) => {
@@ -938,10 +1070,11 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         setSelectedObjectType(null);
         selectedObjectRef.current = null;
         syncLayers();
+        refreshHasDesignContent();
         const th = historyRef.current[target] || { stack: [], pointer: -1 };
         setCanUndo(th.pointer > 0);
         setCanRedo(th.pointer < th.stack.length - 1);
-    }, [ensureCanvasTextFonts, surfaceKeys, syncLayers]);
+    }, [ensureCanvasTextFonts, refreshHasDesignContent, surfaceKeys, syncLayers]);
 
     /* ── value ───────────────────────────────────────────────────── */
 
@@ -968,6 +1101,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef }) {
         captureSurfaceSnapshots,
         restoreCurrentSurface,
         saveProduct,
+        hasDesignContent,
+        isSavingProduct,
         isPreviewMode, setIsPreviewMode, enterPreviewMode, exitPreviewMode,
         isPanMode, togglePanMode,
         zoomMin: SCENE_ZOOM_MIN,

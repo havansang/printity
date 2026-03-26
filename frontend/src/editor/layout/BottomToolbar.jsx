@@ -5,7 +5,15 @@ const ZOOM_STEP = 1.1;
 
 export default function BottomToolbar() {
     const {
-        zoomLevel, zoomMin, zoomMax, applyZoom, isPanMode, togglePanMode, saveProduct,
+        zoomLevel,
+        zoomMin,
+        zoomMax,
+        applyZoom,
+        isPanMode,
+        togglePanMode,
+        hasDesignContent,
+        isSavingProduct,
+        saveProduct,
     } = useEditor();
     const [spacePressed, setSpacePressed] = useState(false);
     const pct = Math.round(zoomLevel * 100);
@@ -29,6 +37,13 @@ export default function BottomToolbar() {
     const handleStepClick = (dir) => {
         const next = dir === 'in' ? zoomLevel * ZOOM_STEP : zoomLevel / ZOOM_STEP;
         applyZoom(next);
+    };
+
+    const handleSaveClick = async () => {
+        const result = await saveProduct();
+        if (!result?.ok && result?.message) {
+            window.alert(result.message);
+        }
     };
 
     return (
@@ -73,9 +88,14 @@ export default function BottomToolbar() {
             </div>
 
             <div className="bt-group bt-right">
-                <button className="bt-save-btn" id="bt-save" onClick={saveProduct}>
+                <button
+                    className="bt-save-btn"
+                    id="bt-save"
+                    onClick={handleSaveClick}
+                    disabled={!hasDesignContent || isSavingProduct}
+                >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
-                    Save Product
+                    {isSavingProduct ? 'Saving...' : 'Save Product'}
                 </button>
             </div>
         </footer>

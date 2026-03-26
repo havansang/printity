@@ -231,7 +231,9 @@ projectSchema.pre('validate', function ensureProjectSurfaces(next) {
     }
   }
 
-  next();
+  if (typeof next === 'function') {
+    return next();
+  }
 });
 
 projectSchema.index({ userId: 1, updatedAt: -1 });

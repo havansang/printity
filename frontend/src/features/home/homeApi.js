@@ -33,3 +33,11 @@ export function fetchProjects(token, {
         },
     });
 }
+
+export function createProject(token, body) {
+    return apiRequest('/projects', {
+        method: 'POST',
+        token,
+        body,
+    });
+}

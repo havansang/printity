@@ -30,6 +30,7 @@ function buildEditorTemplateDefinition(template) {
         name: template.name || 'Product editor',
         productType: template.productType || 'tshirt',
         slug: template.slug || '',
+        defaultRenderOptions: template.defaultRenderOptions || null,
         supportedSurfaces: [],
     };
 

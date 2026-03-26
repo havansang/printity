@@ -1184,14 +1184,20 @@
   box-shadow: 0 2px 10px rgba(92, 107, 255, 0.35);
 }
 
-.bt-save-btn:hover {
+.bt-save-btn:hover:not(:disabled) {
   opacity: 0.9;
   transform: translateY(-1px);
   box-shadow: 0 4px 18px rgba(92, 107, 255, 0.45);
 }
 
-.bt-save-btn:active {
+.bt-save-btn:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+.bt-save-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* =================================================================== */
