@@ -25,10 +25,8 @@ const SCENE_ZOOM_MIN = 0.03;
 const SCENE_ZOOM_MAX = 4;
 const SCENE_ZOOM_STEP = 1.1;
 
-const TEMPLATE_KEY = 'tshirt';
-const TEMPLATE_DEF = templates[TEMPLATE_KEY] || {};
-const TEMPLATE_SURFACE_DEFS = getTemplateSurfaces(TEMPLATE_DEF);
-const TEMPLATE_SURFACE_KEYS = TEMPLATE_SURFACE_DEFS.map((surface) => surface.key);
+const DEFAULT_TEMPLATE_KEY = 'tshirt';
+const DEFAULT_TEMPLATE_DEF = templates[DEFAULT_TEMPLATE_KEY] || {};
 const PRODUCT_DRAFT_STORAGE_KEY = 'printity.productDraft';
 const DEFAULT_SHIRT_COLOR_HEX = '#FFFFFF';
 
@@ -90,16 +88,16 @@ function normalizeShirtColors(items) {
     return normalized.length > 0 ? normalized : DEFAULT_SHIRT_COLORS;
 }
 
-export function EditorProvider({ children }) {
+export function EditorProvider({ children, templateDef: providedTemplateDef }) {
     const canvasRef = useRef(null);
     const [layers, setLayers] = useState([]);
     const [selectedLayerId, setSelectedLayerId] = useState(null);
     const selectedObjectRef = useRef(null);
 
     /* ---------- template --------------------------------------------- */
-    const templateDef = TEMPLATE_DEF;
-    const surfaceDefs = TEMPLATE_SURFACE_DEFS;
-    const surfaceKeys = TEMPLATE_SURFACE_KEYS;
+    const templateDef = providedTemplateDef || DEFAULT_TEMPLATE_DEF;
+    const surfaceDefs = getTemplateSurfaces(templateDef);
+    const surfaceKeys = surfaceDefs.map((surface) => surface.key);
     const defaultSurface = surfaceKeys[0] || 'front';
 
     /* ---------- multi-surface ---------------------------------------- */
@@ -525,7 +523,10 @@ export function EditorProvider({ children }) {
 
     const saveProduct = useCallback(() => {
         const payload = {
-            templateKey: TEMPLATE_KEY,
+            templateId: templateDef.id || null,
+            templateKey: templateDef.templateKey || templateDef.slug || DEFAULT_TEMPLATE_KEY,
+            templateName: templateDef.name || null,
+            productType: templateDef.productType || DEFAULT_TEMPLATE_KEY,
             savedAt: new Date().toISOString(),
             shirtColor,
             activeSurface: activeSurfaceRef.current,
@@ -540,7 +541,7 @@ export function EditorProvider({ children }) {
             console.error('Failed to save product draft', error);
             return { ok: false, error, payload };
         }
-    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas]);
+    }, [captureSurfaceSnapshots, shirtColor, surfacePrintAreas, templateDef]);
 
     const enterPreviewMode = useCallback(() => {
         captureSurfaceSnapshots();

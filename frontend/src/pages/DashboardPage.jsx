@@ -3,6 +3,7 @@ import { navigate } from '../app/router';
 import { useAuth } from '../features/auth/AuthContext';
 import { useHomeData } from '../features/home/useHomeData';
 import { APP_CONFIG } from '../shared/config/appConfig';
+import { resolveRenderableAssetUrl } from '../shared/lib/assetUrls';
 import { formatDateTime, formatProductType, getInitials } from '../shared/lib/formatters';
 
 const DASHBOARD_TABS = [
@@ -22,11 +23,15 @@ function buildDashboardUrl(tab) {
     return `/dashboard?tab=${encodeURIComponent(tab)}`;
 }
 
+function buildEditorUrl(templateId) {
+    return templateId ? `/editor?templateId=${encodeURIComponent(templateId)}` : '/editor';
+}
+
 function getTemplatePreview(template) {
-    if (template?.thumbnailUrl) return template.thumbnailUrl;
+    if (template?.thumbnailUrl) return resolveRenderableAssetUrl(template.thumbnailUrl);
 
     const firstSurface = Object.values(template?.surfaces || {})[0];
-    return firstSurface?.templateImageUrl || '/front.svg';
+    return resolveRenderableAssetUrl(firstSurface?.templateImageUrl) || '/front.svg';
 }
 
 function SidebarNavButton({ isActive, label, icon: Icon, onClick }) {
@@ -163,14 +168,14 @@ function DashboardOverview({
                             </div>
 
                             <div className="dashboard-template-meta">
-                                <span>{Object.keys(template?.surfaces || {}).length} surfaces</span>
+                                <span>{template?.supportedSurfaces?.length || Object.keys(template?.surfaces || {}).length} surfaces</span>
                                 <span>{template?.availableColors?.length || 0} colors</span>
                             </div>
 
                             <button
                                 type="button"
                                 className="primary-action dashboard-card-action"
-                                onClick={() => navigate('/editor')}
+                                onClick={() => navigate(buildEditorUrl(template.id))}
                             >
                                 Design this template
                             </button>
@@ -236,7 +241,7 @@ function ProductsView({ projects, projectsLoading, projectsError }) {
                         <button
                             type="button"
                             className="ghost-action ghost-action-inline"
-                            onClick={() => navigate('/editor')}
+                            onClick={() => navigate(buildEditorUrl(project.templateId))}
                         >
                             Resume in studio
                         </button>

@@ -2033,6 +2033,43 @@ body {
   animation: pulse 0.9s ease-in-out infinite alternate;
 }
 
+.editor-template-state {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #fbfaf5 0%, #f1eee4 100%);
+}
+
+.editor-template-card {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid rgba(86, 79, 50, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 54px rgba(39, 35, 20, 0.08);
+}
+
+.editor-template-card h1,
+.editor-template-card p {
+  margin: 0;
+}
+
+.editor-template-card p:last-of-type {
+  color: var(--app-text-soft);
+  line-height: 1.7;
+}
+
+.editor-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 @keyframes shimmer {
   from {
     background-position: 200% 0;

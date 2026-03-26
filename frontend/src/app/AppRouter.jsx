@@ -24,7 +24,7 @@ export default function AppRouter() {
     if (route.pathname === '/editor') {
         return (
             <Suspense fallback={<RouteFallback />}>
-                <EditorPage />
+                <EditorPage search={route.search} />
             </Suspense>
         );
     }

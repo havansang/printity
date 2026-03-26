@@ -20,6 +20,7 @@ export default function PreviewWorkspace() {
         surfacePrintAreas,
         captureSurfaceSnapshots,
         saveProduct,
+        templateDef,
     } = useEditor();
 
     const [previewItems, setPreviewItems] = useState([]);
@@ -66,7 +67,7 @@ export default function PreviewWorkspace() {
                     return {
                         surface,
                         label: surfaceDef.label,
-                        filename: `tshirt-${surface}-preview.png`,
+                        filename: `${templateDef?.slug || templateDef?.productType || 'product'}-${surface}-preview.png`,
                         previewUrl,
                         ...preview,
                     };
@@ -94,7 +95,7 @@ export default function PreviewWorkspace() {
             cancelled = true;
             objectUrls.forEach((url) => URL.revokeObjectURL(url));
         };
-    }, [captureSurfaceSnapshots, shirtColor, surfaceDefs, surfacePrintAreas]);
+    }, [captureSurfaceSnapshots, shirtColor, surfaceDefs, surfacePrintAreas, templateDef]);
 
     const selectedItem = useMemo(
         () => previewItems.find((item) => item.surface === selectedSurface) || previewItems[0] || null,

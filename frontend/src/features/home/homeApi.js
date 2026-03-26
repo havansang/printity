@@ -10,6 +10,12 @@ export function fetchTemplates({ productType, activeOnly = true } = {}) {
     });
 }
 
+export function fetchTemplate(templateId) {
+    return apiRequest(`/templates/${templateId}`, {
+        method: 'GET',
+    });
+}
+
 export function fetchProjects(token, {
     page = 1,
     limit = 6,

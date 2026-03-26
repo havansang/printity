@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '../config/appConfig';
+import { dispatchAuthSessionExpired } from '../../features/auth/authSessionEvents';
 
 function buildUrl(path, query) {
     const base = APP_CONFIG.apiBaseUrl.replace(/\/$/, '');
@@ -19,6 +20,7 @@ export async function apiRequest(path, {
     token,
     query,
     headers = {},
+    skipAuthRedirect = false,
 } = {}) {
     const requestHeaders = {
         Accept: 'application/json',
@@ -55,6 +57,15 @@ export async function apiRequest(path, {
     }
 
     if (!response.ok || payload?.success === false) {
+        if (response.status === 401 && token && !skipAuthRedirect) {
+            dispatchAuthSessionExpired({
+                path,
+                method,
+                status: response.status,
+                message: payload?.message || 'Session expired',
+            });
+        }
+
         const apiError = new Error(
             payload?.message || `Request failed with status ${response.status}`
         );

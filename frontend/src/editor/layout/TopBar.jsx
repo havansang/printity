@@ -1,3 +1,4 @@
+import { navigate } from '../../app/router';
 import { useEditor } from './EditorContext';
 import { normalizeFontFamily } from './editorFonts';
 
@@ -28,6 +29,7 @@ export default function TopBar() {
         deleteSelected, duplicateSelected,
         isPreviewMode, enterPreviewMode, exitPreviewMode,
         availableFonts, fontsLoading, loadFontFamily,
+        templateDef,
     } = useEditor();
 
     const numericFontWeight = Number(textStyle.fontWeight);
@@ -38,10 +40,15 @@ export default function TopBar() {
     return (
         <header className="top-bar" id="top-bar">
             <div className="tb-group tb-left">
-                <button className="tb-icon-btn tb-back" id="btn-back" title="Back">
+                <button
+                    className="tb-icon-btn tb-back"
+                    id="btn-back"
+                    title="Back"
+                    onClick={() => navigate('/dashboard')}
+                >
                     <ChevronLeft />
                 </button>
-                <span className="tb-title">T-Shirt Design</span>
+                <span className="tb-title">{templateDef?.name || 'Product Design'}</span>
             </div>
 
             <div className="tb-center">

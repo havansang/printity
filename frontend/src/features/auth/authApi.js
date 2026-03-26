@@ -53,5 +53,6 @@ export function logout(token) {
     return apiRequest('/auth/logout', {
         method: 'POST',
         token,
+        skipAuthRedirect: true,
     });
 }

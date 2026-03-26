@@ -94,6 +94,7 @@ export default function CanvasWorkspace() {
         shirtColor,
         isPreviewMode,
         zoomLevel,
+        templateDef,
     } = useEditor();
 
     const [svgRevision, setSvgRevision] = useState(0);
@@ -303,6 +304,9 @@ export default function CanvasWorkspace() {
 
         try {
             const res = await fetch(source);
+            if (!res.ok) {
+                throw new Error(`Failed to load SVG surface: ${activeSurface}`);
+            }
             const text = await res.text();
             if (loadId !== loadIdRef.current) return;
 
@@ -484,7 +488,11 @@ export default function CanvasWorkspace() {
 
             <Positioner>
                 <div ref={sceneRef} className="scene">
-                    <svg ref={svgRef} className="mockup-svg" aria-label="T-shirt template" />
+                    <svg
+                        ref={svgRef}
+                        className="mockup-svg"
+                        aria-label={`${templateDef?.name || 'Product'} template`}
+                    />
                     <canvas ref={canvasElRef} />
                 </div>
             </Positioner>

@@ -1,6 +1,10 @@
 import { navigate } from '../../app/router';
 import { formatDateTime, formatProductType } from '../../shared/lib/formatters';
 
+function buildEditorUrl(templateId) {
+    return templateId ? `/editor?templateId=${encodeURIComponent(templateId)}` : '/editor';
+}
+
 export default function ProjectsPanel({
     isAuthenticated,
     isInitializing,
@@ -88,7 +92,7 @@ export default function ProjectsPanel({
                                     <button
                                         type="button"
                                         className="ghost-action ghost-action-inline"
-                                        onClick={() => navigate('/editor')}
+                                        onClick={() => navigate(buildEditorUrl(project.templateId))}
                                     >
                                         Resume in studio
                                     </button>
