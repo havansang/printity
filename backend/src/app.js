@@ -41,6 +41,7 @@ if (env.NODE_ENV !== 'production') {
 }
 
 app.use('/uploads', express.static(getUploadRootAbsolutePath()));
+app.use('/fonts', express.static(path.resolve(process.cwd(), 'resources', 'fonts')));
 app.use('/mockups', express.static(path.resolve(process.cwd(), 'resources', 'mockups')));
 app.use('/api/v1', apiRoutes);
 

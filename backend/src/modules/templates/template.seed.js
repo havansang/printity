@@ -1,4 +1,5 @@
 const Template = require('./template.model');
+const { PRINTIFY_AVAILABLE_COLORS } = require('./template-color.util');
 const { templateSeedSchema } = require('./template.validation');
 
 const defaultTemplates = [
@@ -8,8 +9,14 @@ const defaultTemplates = [
     productType: 'tshirt',
     description: 'Default front/back t-shirt template for the design editor.',
     version: 1,
+    mockupPack: {
+      slug: 'basic-tshirt',
+      manifestPath: '/mockups/basic-tshirt/manifest.json',
+      defaultColorKey: 'white',
+    },
     thumbnailUrl: '/mockups/basic-tshirt/thumbnail.svg',
     supportedSurfaces: ['front', 'back', 'neckLabelInner'],
+    availableColors: PRINTIFY_AVAILABLE_COLORS,
     defaultRenderOptions: {
       size: 2048,
       format: 'jpeg',
@@ -51,7 +58,6 @@ const defaultTemplates = [
             maskImageUrl: '/mockups/basic-tshirt/front/mask.png',
             shadowImageUrl: '/mockups/basic-tshirt/front/shadow.png',
             highlightImageUrl: '/mockups/basic-tshirt/front/highlight.png',
-            displacementImageUrl: '/mockups/basic-tshirt/front/displacement.png',
             grainImageUrl: '/mockups/basic-tshirt/front/grain.svg',
             occlusionImageUrl: '/mockups/basic-tshirt/front/occlusion.svg',
           },
@@ -62,9 +68,9 @@ const defaultTemplates = [
           },
           displacement: {
             neutral: 128,
-            scaleX: 18,
-            scaleY: 12,
-            blur: 2,
+            scaleX: 0,
+            scaleY: 0,
+            blur: 0,
           },
         },
       },
@@ -171,8 +177,14 @@ const defaultTemplates = [
     productType: 'polo',
     description: 'Default front/back polo template for the design editor.',
     version: 1,
+    mockupPack: {
+      slug: 'basic-polo',
+      manifestPath: '/mockups/basic-polo/manifest.json',
+      defaultColorKey: 'white',
+    },
     thumbnailUrl: '/mockups/basic-polo/thumbnail.svg',
     supportedSurfaces: ['front', 'back', 'neckLabelInner'],
+    availableColors: PRINTIFY_AVAILABLE_COLORS,
     defaultRenderOptions: {
       size: 2048,
       format: 'jpeg',

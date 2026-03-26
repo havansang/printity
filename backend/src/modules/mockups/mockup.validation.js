@@ -1,5 +1,6 @@
 const { SURFACE_KEYS } = require('../../constants/product');
 const { objectIdSchema, z } = require('../../utils/validation');
+const DEBUG_STAGE_KEYS = ['base', 'design', 'masked', 'warped', 'shadowed', 'final'];
 
 const layerSchema = z
   .object({
@@ -73,7 +74,10 @@ const mockupPreviewSchema = z
     responseType: z.enum(['json', 'binary']).default('json'),
     format: z.enum(['png', 'jpeg', 'jpg', 'webp']).optional(),
     size: z.coerce.number().int().positive().max(4096).optional(),
+    colorKey: z.string().trim().min(1).max(100).optional(),
     shirtColor: z.string().trim().min(1).optional(),
+    debug: z.boolean().optional().default(false),
+    debugStages: z.array(z.enum(DEBUG_STAGE_KEYS)).optional(),
   })
   .passthrough()
   .superRefine((value, ctx) => {
@@ -82,6 +86,14 @@ const mockupPreviewSchema = z
         code: z.ZodIssueCode.custom,
         message: 'surfaceKey is required when responseType is binary',
         path: ['surfaceKey'],
+      });
+    }
+
+    if (value.responseType === 'binary' && (value.debug || (Array.isArray(value.debugStages) && value.debugStages.length > 0))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'debug mode is only supported when responseType is json',
+        path: ['debug'],
       });
     }
   });

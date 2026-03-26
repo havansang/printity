@@ -13,6 +13,9 @@ const nullableJsonObjectSchema = z.union([jsonObjectSchema, z.null()]);
 
 const selectionSchema = z
   .object({
+    colorKey: z.string().trim().min(1).max(100).optional(),
+    colorLabel: z.string().trim().min(1).max(100).optional(),
+    colorHex: z.string().trim().min(1).max(20).optional(),
     variantId: z.number().int().positive().optional(),
     cameraId: z.number().int().positive().optional(),
     blueprintId: z.number().int().positive().optional(),

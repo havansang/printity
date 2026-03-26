@@ -7,13 +7,16 @@ const ApiError = require('../../utils/ApiError');
 const { SURFACE_KEYS } = require('../../constants/product');
 const { getUploadRootAbsolutePath } = require('../../utils/file');
 const { getTextToSvg } = require('../fonts/font.service');
+const { normalizeColorKey, normalizeHex } = require('../templates/template-color.util');
 const { getActiveTemplateById } = require('../templates/template.service');
 
 const MOCKUP_ROOT = path.resolve(process.cwd(), 'resources', 'mockups');
 const LOCAL_ASSET_CACHE = new Map();
+const LOCAL_MANIFEST_CACHE = new Map();
 const FORMAT_ALIASES = {
   jpg: 'jpeg',
 };
+const DEFAULT_DEBUG_STAGE_KEYS = ['base', 'design', 'masked', 'warped', 'shadowed', 'final'];
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -145,6 +148,16 @@ function bufferToDataUrl(buffer, mimeType) {
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
+function normalizeDebugStageKeys(debugStages) {
+  const requestedStageKeys = Array.isArray(debugStages) ? debugStages : [];
+
+  if (requestedStageKeys.length === 0) {
+    return [...DEFAULT_DEBUG_STAGE_KEYS];
+  }
+
+  return DEFAULT_DEBUG_STAGE_KEYS.filter((stageKey) => requestedStageKeys.includes(stageKey));
+}
+
 function createTransparentCanvas(width, height) {
   return sharp({
     create: {
@@ -263,6 +276,146 @@ function getLocalAbsolutePathFromPublicUrl(assetUrl) {
   return null;
 }
 
+async function doesLocalAssetExist(assetUrl) {
+  const localAbsolutePath = getLocalAbsolutePathFromPublicUrl(assetUrl);
+  if (!localAbsolutePath) {
+    return false;
+  }
+
+  try {
+    await fs.access(localAbsolutePath);
+    return true;
+  } catch {
+    LOCAL_ASSET_CACHE.delete(localAbsolutePath);
+    return false;
+  }
+}
+
+async function loadMockupManifest(template) {
+  const manifestUrl =
+    template?.mockupPack?.manifestPath ||
+    (template?.mockupPack?.slug ? `/mockups/${template.mockupPack.slug}/manifest.json` : null);
+
+  if (!manifestUrl) {
+    return null;
+  }
+
+  const localAbsolutePath = getLocalAbsolutePathFromPublicUrl(manifestUrl);
+  if (!localAbsolutePath) {
+    return null;
+  }
+
+  if (LOCAL_MANIFEST_CACHE.has(localAbsolutePath)) {
+    try {
+      await fs.access(localAbsolutePath);
+      return LOCAL_MANIFEST_CACHE.get(localAbsolutePath);
+    } catch (error) {
+      LOCAL_MANIFEST_CACHE.delete(localAbsolutePath);
+      if (error?.code === 'ENOENT') {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  try {
+    const rawManifest = await fs.readFile(localAbsolutePath, 'utf8');
+    const parsedManifest = JSON.parse(rawManifest);
+    LOCAL_MANIFEST_CACHE.set(localAbsolutePath, parsedManifest);
+    return parsedManifest;
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return null;
+    }
+
+    if (error instanceof SyntaxError) {
+      throw new ApiError(500, `Invalid mockup manifest JSON: ${manifestUrl}`);
+    }
+
+    throw error;
+  }
+}
+
+function getAvailableMockupColors(template, manifest) {
+  if (Array.isArray(template?.availableColors) && template.availableColors.length > 0) {
+    return template.availableColors;
+  }
+
+  return Array.isArray(manifest?.colors) ? manifest.colors : [];
+}
+
+function findMatchingColor(colors, rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+
+  const normalizedKey = normalizeColorKey(rawValue);
+  const normalizedHex = normalizeHex(rawValue);
+
+  return colors.find((color) => {
+    const colorKey = normalizeColorKey(color?.key || color?.label);
+    const colorLabelKey = normalizeColorKey(color?.label);
+    const colorHex = normalizeHex(color?.hex);
+
+    return (
+      (normalizedKey && (colorKey === normalizedKey || colorLabelKey === normalizedKey)) ||
+      (normalizedHex && colorHex === normalizedHex)
+    );
+  }) || null;
+}
+
+function resolveRequestedColorKey(template, payload, manifest) {
+  const colors = getAvailableMockupColors(template, manifest);
+  const matchedColor = findMatchingColor(colors, payload?.colorKey) || findMatchingColor(colors, payload?.shirtColor);
+  const requestedColorKey = matchedColor?.key || normalizeColorKey(payload?.colorKey || payload?.shirtColor);
+  const defaultColorKey =
+    normalizeColorKey(template?.mockupPack?.defaultColorKey) ||
+    normalizeColorKey(manifest?.defaultColorKey) ||
+    'white';
+
+  return requestedColorKey || defaultColorKey;
+}
+
+function resolveSurfaceFolder(surfaceKey, manifest) {
+  return manifest?.surfaceFolders?.[surfaceKey] || (surfaceKey === 'neckLabelInner' ? 'neck-label-inner' : surfaceKey);
+}
+
+function fillPattern(pattern, variables) {
+  return String(pattern || '').replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => variables[key] ?? '');
+}
+
+async function resolveSurfaceBaseAssetUrl({ template, surfaceKey, surface, colorKey, manifest }) {
+  const fallbackAssetUrl = surface.render?.baseImageUrl || surface.templateImageUrl || null;
+  const basePattern = manifest?.assets?.basePattern || null;
+
+  if (!basePattern) {
+    return fallbackAssetUrl;
+  }
+
+  const surfaceFolder = resolveSurfaceFolder(surfaceKey, manifest);
+  const defaultColorKey =
+    normalizeColorKey(manifest?.defaultColorKey) ||
+    normalizeColorKey(template?.mockupPack?.defaultColorKey) ||
+    'white';
+  const candidateColorKeys = [colorKey, defaultColorKey].filter((value, index, array) => value && array.indexOf(value) === index);
+
+  for (const candidateColorKey of candidateColorKeys) {
+    const candidateAssetUrl = fillPattern(basePattern, {
+      colorKey: candidateColorKey,
+      surfaceKey,
+      surfaceFolder,
+      templateSlug: manifest?.templateSlug || template?.slug || '',
+    });
+
+    if (await doesLocalAssetExist(candidateAssetUrl)) {
+      return candidateAssetUrl;
+    }
+  }
+
+  return fallbackAssetUrl;
+}
+
 async function loadAssetBuffer(assetUrl, hintedMimeType = null) {
   if (!assetUrl) {
     return null;
@@ -281,7 +434,13 @@ async function loadAssetBuffer(assetUrl, hintedMimeType = null) {
   const localAbsolutePath = getLocalAbsolutePathFromPublicUrl(assetUrl);
   if (localAbsolutePath) {
     if (LOCAL_ASSET_CACHE.has(localAbsolutePath)) {
-      return LOCAL_ASSET_CACHE.get(localAbsolutePath);
+      try {
+        await fs.access(localAbsolutePath);
+        return LOCAL_ASSET_CACHE.get(localAbsolutePath);
+      } catch (error) {
+        LOCAL_ASSET_CACHE.delete(localAbsolutePath);
+        throw error;
+      }
     }
 
     const buffer = await fs.readFile(localAbsolutePath);
@@ -755,7 +914,21 @@ async function warpDesignBuffer(sourceBuffer, outputWidth, outputHeight, displac
   }
 
   const sourceDataUrl = bufferToDataUrl(sourceBuffer, 'image/png');
-  const displacementDataUrl = await loadAssetDataUrl(displacementAssetUrl);
+  let displacementDataUrl = null;
+  try {
+    displacementDataUrl = await loadAssetDataUrl(displacementAssetUrl);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return sourceBuffer;
+    }
+
+    throw error;
+  }
+
+  if (!displacementDataUrl) {
+    return sourceBuffer;
+  }
+
   const blur = Math.max(0, Number(displacementConfig?.blur) || 0);
 
   const svgMarkup = `
@@ -853,12 +1026,36 @@ async function resizeFinalBuffer(buffer, width, height, requestedSize, format) {
   };
 }
 
+async function serializeDebugStages(stageBuffers, stageWidth, stageHeight, selectedStageKeys) {
+  const stages = {};
+
+  for (const stageKey of selectedStageKeys) {
+    if (!stageBuffers?.[stageKey]) {
+      continue;
+    }
+
+    const pngBuffer = await sharp(stageBuffers[stageKey]).png().toBuffer();
+    stages[stageKey] = {
+      mimeType: 'image/png',
+      width: stageWidth,
+      height: stageHeight,
+      dataUrl: bufferToDataUrl(pngBuffer, 'image/png'),
+    };
+  }
+
+  return stages;
+}
+
 async function renderSurfacePreview({
   template,
   surfaceKey,
   surfacePayload,
+  colorKey,
+  manifest,
   format,
   requestedSize,
+  debugEnabled = false,
+  debugStageKeys = [],
 }) {
   const surface = template.surfaces?.[surfaceKey];
   if (!surface) {
@@ -867,7 +1064,13 @@ async function renderSurfacePreview({
 
   const editorPrintArea = getEditorPrintArea(surface);
   const renderPrintArea = getRenderPrintArea(surface);
-  const baseAssetUrl = surface.render?.baseImageUrl || surface.templateImageUrl;
+  const baseAssetUrl = await resolveSurfaceBaseAssetUrl({
+    template,
+    surfaceKey,
+    surface,
+    colorKey,
+    manifest,
+  });
   const maskAssetUrl = surface.render?.assets?.maskImageUrl || surface.maskImageUrl || null;
   const shadowAssetUrl = surface.render?.assets?.shadowImageUrl || null;
   const highlightAssetUrl = surface.render?.assets?.highlightImageUrl || null;
@@ -962,6 +1165,21 @@ async function renderSurfacePreview({
   });
 
   const resized = await resizeFinalBuffer(mergedBuffer, outputWidth, outputHeight, null, format);
+  const debugStages = debugEnabled
+    ? await serializeDebugStages(
+        {
+          base: baseBuffer,
+          design: placedDesign,
+          masked: maskedDesign,
+          warped: clippedWarpedDesign,
+          shadowed: shadowedDesign,
+          final: resized.buffer,
+        },
+        resized.width,
+        resized.height,
+        debugStageKeys,
+      )
+    : null;
 
   return {
     surfaceKey,
@@ -970,13 +1188,18 @@ async function renderSurfacePreview({
     width: resized.width,
     height: resized.height,
     buffer: resized.buffer,
+    debugStages,
   };
 }
 
 async function renderMockupPreview(payload) {
   const template = await getActiveTemplateById(payload.templateId);
+  const manifest = await loadMockupManifest(template);
+  const colorKey = resolveRequestedColorKey(template, payload, manifest);
   const format = normalizeFormat(payload.format || template.defaultRenderOptions?.format || 'png');
   const requestedSize = Number(payload.size || template.defaultRenderOptions?.size || 2048);
+  const debugEnabled = Boolean(payload.debug) || (Array.isArray(payload.debugStages) && payload.debugStages.length > 0);
+  const debugStageKeys = normalizeDebugStageKeys(payload.debugStages);
   const surfacePayloads = collectSurfacePayloads(template, payload.print);
   const surfaceKeys = resolveRequestedSurfaceKeys(template, payload.print, payload.surfaceKey);
 
@@ -987,8 +1210,12 @@ async function renderMockupPreview(payload) {
       template,
       surfaceKey,
       surfacePayload: surfacePayloads.get(surfaceKey) || { images: [] },
+      colorKey,
+      manifest,
       format,
       requestedSize,
+      debugEnabled,
+      debugStageKeys,
     });
 
     previews.push(preview);
@@ -1004,6 +1231,7 @@ async function renderMockupPreview(payload) {
 
   return {
     templateId: template._id.toString(),
+    colorKey,
     format,
     previews: previews.map((preview) => ({
       surfaceKey: preview.surfaceKey,
@@ -1012,6 +1240,11 @@ async function renderMockupPreview(payload) {
       width: preview.width,
       height: preview.height,
       dataUrl: bufferToDataUrl(preview.buffer, preview.mimeType),
+      debug: preview.debugStages
+        ? {
+            stages: preview.debugStages,
+          }
+        : undefined,
     })),
   };
 }

@@ -19,6 +19,21 @@ function createDefaultSurfaceState() {
 
 const selectionSchema = new mongoose.Schema(
   {
+    colorKey: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    colorLabel: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    colorHex: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     variantId: {
       type: Number,
       default: null,

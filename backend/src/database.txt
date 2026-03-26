@@ -77,11 +77,25 @@ Fields:
 - productType: String, required, enum ["tshirt", "polo"]
 - description: String, default null
 - version: Number, default 1
+- mockupPack: Object, default {}
+- mockupPack.slug: String, default null
+- mockupPack.manifestPath: String, default null
+- mockupPack.defaultColorKey: String, default "white"
 - providerRefs: Object, default {}
 - providerRefs.blueprintId: Number, default null
 - providerRefs.defaultCameraId: Number, default null
 - providerRefs.defaultDecoratorId: Number, default null
 - supportedSurfaces: [String], enum ["front", "back", "neckLabelInner"], default ["front", "back"]
+- availableColors: [Object], default []
+- availableColors[].key: String, required
+- availableColors[].label: String, required
+- availableColors[].hex: String, required
+- availableColors[].rgb: String, default null
+- availableColors[].imageUrl: String, default null
+- availableColors[].sortOrder: Number, default 0
+- availableColors[].isLight: Boolean, default false
+- availableColors[].isActive: Boolean, default true
+- availableColors[].providerVariantIds: [Number], default []
 - surfaces.front: Object, required
 - surfaces.back: Object, required
 - surfaces.neckLabelInner: Object, default null
@@ -154,6 +168,8 @@ Fields:
 Business rules:
 - Moi template bat buoc co surfaces.front va surfaces.back
 - neckLabelInner la surface tuy chon, dung cho nhan co trong hoac cac vi tri phu
+- mockupPack.manifestPath tro toi file manifest asset tren filesystem, dung de resolve base.png theo colorKey
+- availableColors la danh sach mau frontend duoc phep hien thi/chon cho template
 - templateImageUrl va printArea la data toi thieu de frontend editor co the hien thi surface
 - editor.printArea la vung in trong he toa do SVG editor
 - render.printArea la vung dat design trong he toa do anh mockup PNG
@@ -176,6 +192,9 @@ Fields:
 - templateId: ObjectId, required, ref Template
 - productType: String, required, enum ["tshirt", "polo"]
 - selection: Object, default null
+- selection.colorKey: String, default null
+- selection.colorLabel: String, default null
+- selection.colorHex: String, default null
 - selection.variantId: Number, default null
 - selection.cameraId: Number, default null
 - selection.blueprintId: Number, default null
@@ -213,6 +232,7 @@ Business rules:
 - userId duoc lay tu JWT, khong lay tu client body
 - productType la du lieu denormalized tu Template
 - selection luu variant/camera/decorator ma user dang chon
+- selection.colorKey la khoa on dinh de backend resolve mockup mau ao
 - renderOptions luu options render nhu size, format, mockupMode, mirror
 - printPayloadRaw luu JSON goc client gui len, phuc vu debug, replay va doi soat
 - printPayloadNormalized luu payload da normalize theo rule noi bo cua backend renderer

@@ -715,6 +715,10 @@ Input:
 - body.responseType: "json" | "binary", mac dinh "json"
 - body.format: "png" | "jpeg" | "jpg" | "webp", tuy chon
 - body.size: so nguyen duong <= 4096, la max dimension cua anh preview, tuy chon
+- body.colorKey: color key on dinh cua ao, vi du "white", "black", "heather-navy", tuy chon
+- body.shirtColor: field cu de tuong thich nguoc, backend se co gang map sang colorKey
+- body.debug: true | false, mac dinh false, chi dung voi responseType = "json"
+- body.debugStages: ["base", "design", "masked", "warped", "shadowed", "final"], tuy chon
 - body co the gui them cac field kieu Printify nhu decorator_id, camera_id, variant_id..., backend se bo qua neu khong can
 
 Output khi responseType = "json":
@@ -723,6 +727,7 @@ Output khi responseType = "json":
   "message": "Mockup preview rendered successfully",
   "data": {
     "templateId": "string",
+    "colorKey": "black",
     "format": "png",
     "previews": [
       {
@@ -731,7 +736,47 @@ Output khi responseType = "json":
         "mimeType": "image/png",
         "width": 900,
         "height": 900,
-        "dataUrl": "data:image/png;base64,..."
+        "dataUrl": "data:image/png;base64,...",
+        "debug": {
+          "stages": {
+            "base": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "design": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "masked": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "warped": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "shadowed": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "final": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            }
+          }
+        }
       }
     ]
   }
@@ -745,7 +790,9 @@ Output khi responseType = "binary":
 Ghi chu:
 - API hien tai render duoc layerType image, shape, text
 - API map placeholder sang surface theo dom_id hoac position
+- Neu co colorKey thi backend se resolve base.png theo mockup pack manifest; neu chua co asset cua mau do thi fallback ve mau mac dinh
 - Preview duoc build server-side theo pipeline: place -> mask -> displacement -> blend -> composite
+- Debug mode xuat rieng tung stage de kiem tra asset, chi ho tro voi responseType = "json"
 
 8. GHI CHU DE FRONTEND GOI API
 - Tat ca API can auth deu dung header Authorization: Bearer <jwt>

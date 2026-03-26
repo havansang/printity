@@ -2,7 +2,19 @@ import {
     createContext, useContext, useCallback, useRef, useState, useEffect,
 } from 'react';
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
+import { fetchBackendFonts } from '../../shared/api/fontsApi';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
+import {
+    DEFAULT_EDITOR_FONT_FAMILY,
+    createFontLoadKey,
+    findEditorFontByFamily,
+    loadEditorFontFace,
+    mergeEditorFonts,
+    pickEditorFontVariant,
+    normalizeFontFamily,
+    normalizeFontStyle,
+    normalizeFontWeight,
+} from './editorFonts';
 
 const CUSTOM_PROPS = ['_layerId', '_imageName', '_shapeType', '_layerType'];
 const MAX_HISTORY = 50;
@@ -85,6 +97,14 @@ export function EditorProvider({ children }) {
     /* ---------- uploads gallery -------------------------------------- */
     const [uploadedImages, setUploadedImages] = useState([]);
 
+    /* ---------- backend font catalog --------------------------------- */
+    const [availableFonts, setAvailableFonts] = useState(() => mergeEditorFonts());
+    const availableFontsRef = useRef(availableFonts);
+    const [fontsLoading, setFontsLoading] = useState(true);
+    const [fontsError, setFontsError] = useState('');
+    const loadedFontFacesRef = useRef(new Set());
+    const pendingFontLoadsRef = useRef(new Map());
+
     /* ---------- selected object type --------------------------------- */
     const [selectedObjectType, setSelectedObjectType] = useState(null);
 
@@ -100,7 +120,7 @@ export function EditorProvider({ children }) {
 
     /* ---------- text style ------------------------------------------ */
     const DEFAULT_TEXT_STYLE = {
-        fontSize: 28, fontFamily: 'Inter, sans-serif', fill: '#222222',
+        fontSize: 28, fontFamily: DEFAULT_EDITOR_FONT_FAMILY, fill: '#222222',
         fontWeight: 'normal', fontStyle: 'normal', textAlign: 'left', isText: false,
     };
     const [textStyle, setTextStyle] = useState(DEFAULT_TEXT_STYLE);
@@ -109,7 +129,150 @@ export function EditorProvider({ children }) {
         activeSurfaceRef.current = activeSurface;
     }, [activeSurface]);
 
+    useEffect(() => {
+        availableFontsRef.current = availableFonts;
+    }, [availableFonts]);
+
+    const refreshTextObjectLayout = useCallback((obj) => {
+        if (!obj || !(obj instanceof IText)) return false;
+
+        if (typeof obj.initDimensions === 'function') {
+            obj.initDimensions();
+        }
+
+        obj.set({
+            dirty: true,
+        });
+        obj.setCoords();
+        return true;
+    }, []);
+
+    const refreshCanvasTextLayout = useCallback((canvas, { fontFamily } = {}) => {
+        if (!canvas) return false;
+
+        const targetFamily = fontFamily ? normalizeFontFamily(fontFamily) : '';
+        let hasChanges = false;
+
+        canvas.getObjects().forEach((obj) => {
+            if (!(obj instanceof IText)) return;
+            if (targetFamily && normalizeFontFamily(obj.fontFamily) !== targetFamily) return;
+
+            hasChanges = refreshTextObjectLayout(obj) || hasChanges;
+        });
+
+        return hasChanges;
+    }, [refreshTextObjectLayout]);
+
+    const loadFontFamily = useCallback(async (fontFamily, options = {}) => {
+        const normalizedFamily = normalizeFontFamily(fontFamily);
+        const requestedWeight = normalizeFontWeight(options.fontWeight);
+        const requestedStyle = normalizeFontStyle(options.fontStyle);
+        const fontLoadKey = createFontLoadKey(normalizedFamily, requestedWeight, requestedStyle);
+
+        if (loadedFontFacesRef.current.has(fontLoadKey)) {
+            if (refreshCanvasTextLayout(canvasRef.current, { fontFamily: normalizedFamily })) {
+                canvasRef.current?.requestRenderAll();
+            }
+            return normalizedFamily;
+        }
+
+        if (typeof document !== 'undefined' && document.fonts?.check(`${requestedStyle} ${requestedWeight} 16px "${normalizedFamily}"`)) {
+            loadedFontFacesRef.current.add(fontLoadKey);
+            if (refreshCanvasTextLayout(canvasRef.current, { fontFamily: normalizedFamily })) {
+                canvasRef.current?.requestRenderAll();
+            }
+            return normalizedFamily;
+        }
+
+        if (pendingFontLoadsRef.current.has(fontLoadKey)) {
+            return pendingFontLoadsRef.current.get(fontLoadKey);
+        }
+
+        const fontEntry = findEditorFontByFamily(availableFontsRef.current, normalizedFamily) || {
+            family: normalizedFamily,
+            variants: [],
+        };
+
+        const loadPromise = loadEditorFontFace(fontEntry, {
+            fontWeight: requestedWeight,
+            fontStyle: requestedStyle,
+        })
+            .then((loadedFamily) => {
+                loadedFontFacesRef.current.add(fontLoadKey);
+                refreshCanvasTextLayout(canvasRef.current, { fontFamily: normalizedFamily });
+                canvasRef.current?.requestRenderAll();
+                return loadedFamily || normalizedFamily;
+            })
+            .catch((error) => {
+                console.warn(`Failed to load font "${normalizedFamily}"`, error);
+                return normalizedFamily;
+            })
+            .finally(() => {
+                pendingFontLoadsRef.current.delete(fontLoadKey);
+            });
+
+        pendingFontLoadsRef.current.set(fontLoadKey, loadPromise);
+        return loadPromise;
+    }, [refreshCanvasTextLayout]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        setFontsLoading(true);
+        setFontsError('');
+
+        fetchBackendFonts({ includeVariants: true })
+            .then((payload) => {
+                if (isCancelled) return;
+                const nextFonts = mergeEditorFonts(
+                    payload?.data?.items || [],
+                    payload?.data?.fallbackFamilies || []
+                );
+                setAvailableFonts(nextFonts);
+                void loadFontFamily(DEFAULT_EDITOR_FONT_FAMILY);
+            })
+            .catch((error) => {
+                if (isCancelled) return;
+                setAvailableFonts(mergeEditorFonts());
+                setFontsError(error?.message || 'Unable to load fonts from the API.');
+            })
+            .finally(() => {
+                if (!isCancelled) setFontsLoading(false);
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [loadFontFamily]);
+
     /* ── helpers ─────────────────────────────────────────────────── */
+
+    const ensureCanvasTextFonts = useCallback((canvas) => {
+        if (!canvas) return;
+
+        let hasChanges = false;
+
+        canvas.getObjects().forEach((obj) => {
+            if (!(obj instanceof IText)) return;
+
+            const normalizedFamily = normalizeFontFamily(obj.fontFamily);
+            if (normalizedFamily !== obj.fontFamily) {
+                obj.set('fontFamily', normalizedFamily);
+                hasChanges = true;
+            }
+
+            void loadFontFamily(normalizedFamily, {
+                fontWeight: obj.fontWeight,
+                fontStyle: obj.fontStyle,
+            });
+
+            hasChanges = refreshTextObjectLayout(obj) || hasChanges;
+        });
+
+        if (hasChanges) {
+            canvas.requestRenderAll();
+        }
+    }, [loadFontFamily, refreshTextObjectLayout]);
 
     const _getPrintArea = useCallback(() => {
         const surface = activeSurface;
@@ -180,16 +343,21 @@ export function EditorProvider({ children }) {
             setTextStyle((s) => ({ ...s, isText: false }));
             return;
         }
+        const normalizedFamily = normalizeFontFamily(obj.fontFamily);
+        void loadFontFamily(normalizedFamily, {
+            fontWeight: obj.fontWeight,
+            fontStyle: obj.fontStyle,
+        });
         setTextStyle({
             fontSize: obj.fontSize ?? 28,
-            fontFamily: obj.fontFamily ?? 'Inter, sans-serif',
+            fontFamily: normalizedFamily,
             fill: obj.fill ?? '#222222',
             fontWeight: obj.fontWeight ?? 'normal',
             fontStyle: obj.fontStyle ?? 'normal',
             textAlign: obj.textAlign ?? 'left',
             isText: true,
         });
-    }, []);
+    }, [loadFontFamily]);
 
     const _detectObjectType = useCallback((obj) => {
         if (!obj) { setSelectedObjectType(null); return; }
@@ -204,15 +372,40 @@ export function EditorProvider({ children }) {
         _detectObjectType(obj);
     }, [_readTextStyle, _detectObjectType]);
 
-    const updateTextStyle = useCallback((prop, value) => {
+    const updateTextStyle = useCallback(async (prop, value) => {
         const canvas = canvasRef.current;
         const obj = selectedObjectRef.current;
         if (!canvas || !obj || !(obj instanceof IText)) return;
-        obj.set(prop, value);
+
+        let nextValue = value;
+        if (prop === 'fontFamily') {
+            nextValue = normalizeFontFamily(value);
+            await loadFontFamily(nextValue, {
+                fontWeight: obj.fontWeight,
+                fontStyle: obj.fontStyle,
+            });
+        }
+
+        if (prop === 'fontWeight') {
+            await loadFontFamily(obj.fontFamily, {
+                fontWeight: value,
+                fontStyle: obj.fontStyle,
+            });
+        }
+
+        if (prop === 'fontStyle') {
+            await loadFontFamily(obj.fontFamily, {
+                fontWeight: obj.fontWeight,
+                fontStyle: value,
+            });
+        }
+
+        obj.set(prop, nextValue);
+        refreshTextObjectLayout(obj);
         canvas.requestRenderAll();
-        setTextStyle((s) => ({ ...s, [prop]: value }));
+        setTextStyle((s) => ({ ...s, [prop]: nextValue }));
         syncLayers();
-    }, [syncLayers]);
+    }, [loadFontFamily, refreshTextObjectLayout, syncLayers]);
 
     /* ── object constraints (stay in printArea) ─────────────────── */
     const _constrainObject = useCallback((obj) => {
@@ -271,12 +464,13 @@ export function EditorProvider({ children }) {
 
         _isRestoringHistory.current = true;
         await targetCanvas.loadFromJSON(cloneSerializable(snapshot));
+        ensureCanvasTextFonts(targetCanvas);
         targetCanvas.requestRenderAll();
         _isRestoringHistory.current = false;
         syncLayers();
         _refreshUndoRedo();
         return true;
-    }, [_refreshUndoRedo, syncLayers]);
+    }, [_refreshUndoRedo, ensureCanvasTextFonts, syncLayers]);
 
     const saveProduct = useCallback(() => {
         const payload = {
@@ -304,7 +498,7 @@ export function EditorProvider({ children }) {
         selectedObjectRef.current = null;
         setTextStyle({
             fontSize: 28,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: DEFAULT_EDITOR_FONT_FAMILY,
             fill: '#222222',
             fontWeight: 'normal',
             fontStyle: 'normal',
@@ -327,11 +521,12 @@ export function EditorProvider({ children }) {
         _isRestoringHistory.current = true;
         h.pointer--;
         await canvas.loadFromJSON(h.stack[h.pointer]);
+        ensureCanvasTextFonts(canvas);
         canvas.requestRenderAll();
         _isRestoringHistory.current = false;
         syncLayers();
         _refreshUndoRedo();
-    }, [activeSurface, syncLayers, _refreshUndoRedo]);
+    }, [activeSurface, ensureCanvasTextFonts, syncLayers, _refreshUndoRedo]);
 
     const redo = useCallback(async () => {
         const canvas = canvasRef.current;
@@ -340,11 +535,12 @@ export function EditorProvider({ children }) {
         _isRestoringHistory.current = true;
         h.pointer++;
         await canvas.loadFromJSON(h.stack[h.pointer]);
+        ensureCanvasTextFonts(canvas);
         canvas.requestRenderAll();
         _isRestoringHistory.current = false;
         syncLayers();
         _refreshUndoRedo();
-    }, [activeSurface, syncLayers, _refreshUndoRedo]);
+    }, [activeSurface, ensureCanvasTextFonts, syncLayers, _refreshUndoRedo]);
 
     /* ── canvas actions ──────────────────────────────────────────── */
 
@@ -361,8 +557,9 @@ export function EditorProvider({ children }) {
         canvas.on('object:removed', () => { if (!_isRestoringHistory.current) _triggerAutoSave(); });
 
         /* ── pan mode mouse hooks (attached once) ── */
+        ensureCanvasTextFonts(canvas);
         if (!surfaceDataRef.current[activeSurfaceRef.current]) syncLayers();
-    }, [syncLayers, _constrainObject, _triggerAutoSave]);
+    }, [ensureCanvasTextFonts, syncLayers, _constrainObject, _triggerAutoSave]);
 
     /* ── pan mode toggle ─────────────────────────────────────────── */
     const togglePanMode = useCallback((active) => {
@@ -416,27 +613,54 @@ export function EditorProvider({ children }) {
 
     /* ── add objects ─────────────────────────────────────────────── */
 
-    const addText = useCallback((fontFamily) => {
+    const addText = useCallback(async (fontInput) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const pa = _getPrintArea();
         const unitScale = _getObjectUnitScale();
         const baseOffset = 20 * unitScale;
         const randomOffset = 60 * unitScale;
+        const requestedFamily = typeof fontInput === 'string' ? fontInput : fontInput?.family;
+        const nextFontFamily = normalizeFontFamily(requestedFamily);
+        const requestedFontWeight = typeof fontInput === 'object' ? fontInput?.fontWeight : 400;
+        const requestedFontStyle = typeof fontInput === 'object' ? fontInput?.fontStyle : 'normal';
+        const fontEntry = (typeof fontInput === 'object' && fontInput?.family)
+            ? {
+                family: nextFontFamily,
+                variants: Array.isArray(fontInput.variants) ? fontInput.variants : [],
+                category: fontInput.category,
+            }
+            : (findEditorFontByFamily(availableFontsRef.current, nextFontFamily) || {
+                family: nextFontFamily,
+                variants: [],
+            });
+        const defaultVariant = pickEditorFontVariant(fontEntry, {
+            fontWeight: requestedFontWeight,
+            fontStyle: requestedFontStyle,
+        });
+        const nextFontWeight = normalizeFontWeight(defaultVariant?.fontWeight ?? requestedFontWeight);
+        const nextFontStyle = normalizeFontStyle(defaultVariant?.fontStyle ?? requestedFontStyle);
+        await loadFontFamily(nextFontFamily, {
+            fontWeight: nextFontWeight,
+            fontStyle: nextFontStyle,
+        });
         const text = new IText('Your text here', {
             left: pa.x + baseOffset + Math.random() * randomOffset,
             top: pa.y + baseOffset + Math.random() * randomOffset,
             fontSize: Math.round(32 * unitScale),
-            fontFamily: fontFamily || 'Inter, sans-serif',
+            fontFamily: nextFontFamily,
+            fontWeight: nextFontWeight,
+            fontStyle: nextFontStyle,
             fill: '#222222',
         });
         text._layerType = 'text';
+        refreshTextObjectLayout(text);
         canvas.add(text);
         canvas.setActiveObject(text);
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
-    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
+    }, [loadFontFamily, refreshTextObjectLayout, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const addImage = useCallback((file) => {
         const canvas = canvasRef.current;
@@ -651,6 +875,7 @@ export function EditorProvider({ children }) {
         canvas.clear();
         const targetJson = surfaceDataRef.current[target];
         if (targetJson) await canvas.loadFromJSON(targetJson);
+        ensureCanvasTextFonts(canvas);
         canvas.backgroundColor = '#ffffff';
         canvas.requestRenderAll();
         _isRestoringHistory.current = false;
@@ -664,7 +889,7 @@ export function EditorProvider({ children }) {
         const th = historyRef.current[target] || { stack: [], pointer: -1 };
         setCanUndo(th.pointer > 0);
         setCanRedo(th.pointer < th.stack.length - 1);
-    }, [surfaceKeys, syncLayers]);
+    }, [ensureCanvasTextFonts, surfaceKeys, syncLayers]);
 
     /* ── value ───────────────────────────────────────────────────── */
 
@@ -680,6 +905,7 @@ export function EditorProvider({ children }) {
         reorderLayers,
         textStyle, setSelectedObject, updateTextStyle,
         selectedObjectType,
+        availableFonts, fontsLoading, fontsError, loadFontFamily,
         uploadedImages,
         shirtColor, setShirtColor,
         templateDef,

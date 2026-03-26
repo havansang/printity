@@ -172,6 +172,37 @@ const providerRefsSchema = new mongoose.Schema(
   },
 );
 
+const availableColorSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+    hex: { type: String, required: true, trim: true },
+    rgb: { type: String, trim: true, default: null },
+    imageUrl: { type: String, trim: true, default: null },
+    sortOrder: { type: Number, default: 0 },
+    isLight: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
+    providerVariantIds: {
+      type: [Number],
+      default: () => [],
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
+const mockupPackSchema = new mongoose.Schema(
+  {
+    slug: { type: String, trim: true, default: null },
+    manifestPath: { type: String, trim: true, default: null },
+    defaultColorKey: { type: String, trim: true, default: 'white' },
+  },
+  {
+    _id: false,
+  },
+);
+
 const defaultRenderOptionsSchema = new mongoose.Schema(
   {
     size: { type: Number, default: 2048 },
@@ -238,6 +269,10 @@ const templateSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    mockupPack: {
+      type: mockupPackSchema,
+      default: () => ({}),
+    },
     providerRefs: {
       type: providerRefsSchema,
       default: () => ({}),
@@ -255,6 +290,10 @@ const templateSchema = new mongoose.Schema(
       front: { type: surfaceSchema, required: true },
       back: { type: surfaceSchema, required: true },
       neckLabelInner: { type: surfaceSchema, default: null },
+    },
+    availableColors: {
+      type: [availableColorSchema],
+      default: () => [],
     },
     thumbnailUrl: {
       type: String,

@@ -70,6 +70,20 @@ const transformPolicySchema = z
   })
   .strict();
 
+const availableColorSchema = z
+  .object({
+    key: z.string().trim().min(1).max(100),
+    label: z.string().trim().min(1).max(100),
+    hex: z.string().trim().min(1).max(20),
+    rgb: z.string().trim().min(1).max(50).nullable().optional(),
+    imageUrl: z.string().trim().min(1).max(500).nullable().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+    isLight: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    providerVariantIds: z.array(z.number().int().positive()).optional(),
+  })
+  .strict();
+
 const renderSurfaceSchema = z
   .object({
     outputWidth: z.number().positive().optional(),
@@ -133,6 +147,14 @@ const templateSeedSchema = z.object({
   productType: z.enum(PRODUCT_TYPES),
   description: z.string().trim().max(500).optional(),
   version: z.number().int().positive().optional(),
+  mockupPack: z
+    .object({
+      slug: z.string().trim().min(1).max(100).optional(),
+      manifestPath: z.string().trim().min(1).max(500).optional(),
+      defaultColorKey: z.string().trim().min(1).max(100).optional(),
+    })
+    .strict()
+    .optional(),
   providerRefs: z
     .object({
       blueprintId: z.number().int().positive().optional(),
@@ -147,6 +169,7 @@ const templateSeedSchema = z.object({
     back: templateSurfaceSchema,
     neckLabelInner: templateSurfaceSchema.optional(),
   }),
+  availableColors: z.array(availableColorSchema).optional(),
   thumbnailUrl: z.string().trim().min(1).optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
