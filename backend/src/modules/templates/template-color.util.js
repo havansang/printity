@@ -19,7 +19,10 @@ function resolvePrintifyColorsPath() {
 }
 
 const PRINTIFY_COLORS_PATH = resolvePrintifyColorsPath();
-const rawPrintifyColors = JSON.parse(fs.readFileSync(PRINTIFY_COLORS_PATH, 'utf8').replace(/^\uFEFF/, ''));
+
+function readPrintifyColors() {
+  return JSON.parse(fs.readFileSync(PRINTIFY_COLORS_PATH, 'utf8').replace(/^\uFEFF/, ''));
+}
 
 function normalizeHex(hex) {
   const value = String(hex || '').trim().toUpperCase();
@@ -89,7 +92,7 @@ function mapPrintifyColor(color, index) {
   };
 }
 
-function buildAvailableColors(colors = rawPrintifyColors) {
+function buildAvailableColors(colors = readPrintifyColors()) {
   const deduped = new Map();
 
   colors.forEach((color, index) => {
@@ -112,6 +115,7 @@ module.exports = {
   PRINTIFY_AVAILABLE_COLORS,
   PRINTIFY_COLORS_PATH,
   buildAvailableColors,
+  readPrintifyColors,
   normalizeColorKey,
   normalizeHex,
 };

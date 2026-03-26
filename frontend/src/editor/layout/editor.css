@@ -771,6 +771,13 @@
   gap: 5px;
 }
 
+.rp-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-4);
+}
+
 .color-swatch {
   width: 22px;
   height: 22px;

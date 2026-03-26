@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import AuthPage from '../pages/AuthPage';
+import DashboardPage from '../pages/DashboardPage';
 import HomePage from '../pages/HomePage';
 import AppHeader from '../shared/ui/AppHeader';
 import { readRoute, subscribeToRouteChanges } from './router';
@@ -34,6 +35,10 @@ export default function AppRouter() {
                 <AuthPage search={route.search} />
             </div>
         );
+    }
+
+    if (route.pathname === '/dashboard') {
+        return <DashboardPage search={route.search} />;
     }
 
     return (

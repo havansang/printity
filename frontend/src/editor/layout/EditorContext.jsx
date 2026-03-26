@@ -2,6 +2,7 @@ import {
     createContext, useContext, useCallback, useRef, useState, useEffect,
 } from 'react';
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
+import { fetchProductColors } from '../../shared/api/colorsApi';
 import { fetchBackendFonts } from '../../shared/api/fontsApi';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
 import {
@@ -29,6 +30,7 @@ const TEMPLATE_DEF = templates[TEMPLATE_KEY] || {};
 const TEMPLATE_SURFACE_DEFS = getTemplateSurfaces(TEMPLATE_DEF);
 const TEMPLATE_SURFACE_KEYS = TEMPLATE_SURFACE_DEFS.map((surface) => surface.key);
 const PRODUCT_DRAFT_STORAGE_KEY = 'printity.productDraft';
+const DEFAULT_SHIRT_COLOR_HEX = '#FFFFFF';
 
 const EditorContext = createContext(null);
 let _nextId = 1;
@@ -43,27 +45,50 @@ function createSurfaceMap(surfaceKeys, createValue) {
 }
 
 /* ── Color palette from spec ──────────────────────────────── */
-export const SHIRT_COLORS = [
-    { name: 'White', hex: '#FFFFFF' },
-    { name: 'Silver', hex: '#C0C0C0' },
-    { name: 'Iron Grey', hex: '#808080' },
-    { name: 'Grey Concrete', hex: '#9E9E9E' },
-    { name: 'Black', hex: '#1A1A1A' },
-    { name: 'True Red', hex: '#CC0000' },
-    { name: 'Cardinal', hex: '#8B0000' },
-    { name: 'Maroon', hex: '#800000' },
-    { name: 'Neon Orange', hex: '#FF6600' },
-    { name: 'Gold', hex: '#FFD700' },
-    { name: 'Neon Yellow', hex: '#FFFF00' },
-    { name: 'Lime Shock', hex: '#AAFF00' },
-    { name: 'Olive Drab Green', hex: '#6B8E23' },
-    { name: 'Kelly Green', hex: '#4CBB17' },
-    { name: 'Atomic Blue', hex: '#4F94CD' },
-    { name: 'True Royal', hex: '#4169E1' },
-    { name: 'True Navy', hex: '#1C2B5E' },
-    { name: 'Purple', hex: '#6A0DAD' },
-    { name: 'Neon Pink', hex: '#FF69B4' },
+const DEFAULT_SHIRT_COLORS = [
+    {
+        key: 'white',
+        label: 'White',
+        hex: DEFAULT_SHIRT_COLOR_HEX,
+        rgb: 'rgb(255,255,255)',
+        imageUrl: null,
+        isLight: true,
+    },
 ];
+
+function normalizeShirtColorHex(hex) {
+    const value = String(hex || '').trim().toUpperCase();
+    if (!value) return null;
+    return value.startsWith('#') ? value : `#${value}`;
+}
+
+function normalizeShirtColors(items) {
+    if (!Array.isArray(items)) {
+        return DEFAULT_SHIRT_COLORS;
+    }
+
+    const normalized = items
+        .map((item, index) => {
+            const label = String(item?.label || item?.name || '').trim();
+            const hex = normalizeShirtColorHex(item?.hex);
+
+            if (!label || !hex) {
+                return null;
+            }
+
+            return {
+                key: String(item?.key || label || index).trim(),
+                label,
+                hex,
+                rgb: String(item?.rgb || '').trim() || null,
+                imageUrl: String(item?.imageUrl || '').trim() || null,
+                isLight: Boolean(item?.isLight),
+            };
+        })
+        .filter(Boolean);
+
+    return normalized.length > 0 ? normalized : DEFAULT_SHIRT_COLORS;
+}
 
 export function EditorProvider({ children }) {
     const canvasRef = useRef(null);
@@ -82,7 +107,10 @@ export function EditorProvider({ children }) {
     const activeSurfaceRef = useRef(defaultSurface);
     const surfaceDataRef = useRef(createSurfaceMap(surfaceKeys, () => null));
 
-    const [shirtColor, setShirtColor] = useState('#FFFFFF');
+    const [shirtColor, setShirtColor] = useState(DEFAULT_SHIRT_COLOR_HEX);
+    const [shirtColors, setShirtColors] = useState(DEFAULT_SHIRT_COLORS);
+    const [shirtColorsLoading, setShirtColorsLoading] = useState(true);
+    const [shirtColorsError, setShirtColorsError] = useState('');
     const [surfacePrintAreas, setSurfacePrintAreas] = useState(
         createSurfaceMap(surfaceKeys, () => cloneSerializable(DEFAULT_PRINT_AREA))
     );
@@ -132,6 +160,37 @@ export function EditorProvider({ children }) {
     useEffect(() => {
         availableFontsRef.current = availableFonts;
     }, [availableFonts]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        setShirtColorsLoading(true);
+        setShirtColorsError('');
+
+        fetchProductColors()
+            .then((payload) => {
+                if (isCancelled) return;
+                const nextColors = normalizeShirtColors(payload?.data?.items);
+                setShirtColors(nextColors);
+                setShirtColor((currentValue) => (
+                    nextColors.some((color) => color.hex === currentValue)
+                        ? currentValue
+                        : (nextColors[0]?.hex || DEFAULT_SHIRT_COLOR_HEX)
+                ));
+            })
+            .catch((error) => {
+                if (isCancelled) return;
+                setShirtColors(DEFAULT_SHIRT_COLORS);
+                setShirtColorsError(error?.message || 'Unable to load product colors from the API.');
+            })
+            .finally(() => {
+                if (!isCancelled) setShirtColorsLoading(false);
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
 
     const refreshTextObjectLayout = useCallback((obj) => {
         if (!obj || !(obj instanceof IText)) return false;
@@ -900,6 +959,7 @@ export function EditorProvider({ children }) {
         availableFonts, fontsLoading, fontsError, loadFontFamily,
         uploadedImages,
         shirtColor, setShirtColor,
+        shirtColors, shirtColorsLoading, shirtColorsError,
         templateDef,
         printArea: _getPrintArea(),
         surfacePrintAreas,

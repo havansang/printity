@@ -242,7 +242,7 @@ export default function AuthForm({ mode, onModeChange }) {
 
                     try {
                         await loginWithGoogle({ idToken: response.credential });
-                        navigate('/');
+                        navigate('/dashboard');
                     } catch (error) {
                         if (isCancelled) {
                             return;
@@ -355,7 +355,7 @@ export default function AuthForm({ mode, onModeChange }) {
                 });
             }
 
-            navigate('/');
+            navigate('/dashboard');
         } catch (error) {
             setFieldErrors(collectApiErrors(error));
             setSubmitError(error?.message || 'Unable to submit this form right now.');

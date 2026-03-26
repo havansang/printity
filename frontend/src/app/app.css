@@ -1515,6 +1515,435 @@ body {
   font-weight: 800;
 }
 
+.dashboard-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 284px minmax(0, 1fr);
+  background:
+    linear-gradient(180deg, #fbfaf5 0%, #f4f1e8 100%);
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 16px 18px;
+  background: #e9e5d9;
+  border-right: 1px solid rgba(86, 79, 50, 0.12);
+}
+
+.dashboard-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  padding: 8px 8px 18px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-brand-mark,
+.dashboard-account-summary-avatar,
+.dashboard-account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  font-weight: 800;
+}
+
+.dashboard-brand-mark {
+  width: 48px;
+  height: 48px;
+  background: #2f3108;
+  color: #b5ff60;
+  font-size: 24px;
+}
+
+.dashboard-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-brand-copy strong {
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: #2f3108;
+}
+
+.dashboard-brand-copy small {
+  color: #6e684f;
+  font-size: 12px;
+}
+
+.dashboard-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-sidebar-link,
+.dashboard-account-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: #2f3108;
+  cursor: pointer;
+  transition:
+    transform var(--app-transition),
+    background var(--app-transition),
+    border-color var(--app-transition),
+    box-shadow var(--app-transition);
+}
+
+.dashboard-sidebar-link {
+  min-height: 52px;
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dashboard-sidebar-link:hover,
+.dashboard-account-summary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(86, 79, 50, 0.12);
+}
+
+.dashboard-sidebar-link.active,
+.dashboard-account-summary.active {
+  background: #ffffff;
+  border-color: rgba(86, 79, 50, 0.12);
+  box-shadow: 0 14px 28px rgba(39, 35, 20, 0.08);
+}
+
+.dashboard-sidebar-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(47, 49, 8, 0.08);
+  color: #2f3108;
+}
+
+.dashboard-sidebar-link-icon svg,
+.dashboard-account-summary svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dashboard-account-summary {
+  margin-top: auto;
+  padding: 12px;
+  text-align: left;
+}
+
+.dashboard-account-summary-avatar,
+.dashboard-account-avatar {
+  background: #2f3108;
+  color: #b5ff60;
+}
+
+.dashboard-account-summary-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.dashboard-account-summary-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-account-summary-copy strong,
+.dashboard-account-copy h3,
+.dashboard-empty-state h3,
+.dashboard-template-body h3,
+.dashboard-product-card h3,
+.dashboard-main-head h1,
+.dashboard-section-head h2,
+.dashboard-hero-copy h1 {
+  margin: 0;
+  color: #2f3108;
+}
+
+.dashboard-account-summary-copy small {
+  overflow: hidden;
+  color: #6e684f;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px;
+}
+
+.dashboard-main-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.dashboard-main-head h1,
+.dashboard-section-head h2,
+.dashboard-hero-copy h1 {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 0.98;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.dashboard-main-subtitle,
+.dashboard-hero-copy p,
+.dashboard-template-body p,
+.dashboard-product-card p,
+.dashboard-product-card time,
+.dashboard-empty-state p,
+.dashboard-account-copy p,
+.dashboard-detail-row span,
+.dashboard-metric-card small,
+.dashboard-account-actions + *,
+.dashboard-template-meta span {
+  margin: 0;
+  color: #5e6a61;
+  line-height: 1.7;
+}
+
+.dashboard-eyebrow {
+  margin: 0 0 10px;
+  color: #6c6a3d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboard-section-card,
+.dashboard-hero-card {
+  border: 1px solid rgba(86, 79, 50, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 50px rgba(39, 35, 20, 0.06);
+}
+
+.dashboard-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(181, 255, 96, 0.22), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 248, 241, 0.96) 100%);
+}
+
+.dashboard-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-section-card {
+  padding: 28px;
+}
+
+.dashboard-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.dashboard-metric-grid,
+.dashboard-template-grid,
+.dashboard-product-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-metric-card,
+.dashboard-template-card,
+.dashboard-product-card,
+.dashboard-empty-state,
+.dashboard-account-panel {
+  border: 1px solid rgba(86, 79, 50, 0.12);
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.dashboard-metric-card,
+.dashboard-template-card,
+.dashboard-product-card,
+.dashboard-empty-state {
+  padding: 20px;
+}
+
+.dashboard-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-metric-card span {
+  color: #6e684f;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard-metric-card strong,
+.dashboard-detail-row strong {
+  color: #2f3108;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+.dashboard-template-grid,
+.dashboard-product-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-template-card,
+.dashboard-product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition:
+    transform var(--app-transition),
+    box-shadow var(--app-transition),
+    border-color var(--app-transition);
+}
+
+.dashboard-template-card:hover,
+.dashboard-product-card:hover,
+.dashboard-account-panel:hover {
+  transform: translateY(-4px);
+  border-color: rgba(86, 79, 50, 0.2);
+  box-shadow: 0 18px 36px rgba(39, 35, 20, 0.08);
+}
+
+.dashboard-template-card-top,
+.dashboard-product-card-top,
+.dashboard-template-meta,
+.dashboard-detail-row,
+.dashboard-account-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-template-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 210px;
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f3f4ed 0%, #e9eadf 100%);
+}
+
+.dashboard-template-thumb img {
+  width: 100%;
+  max-width: 220px;
+  max-height: 220px;
+  object-fit: contain;
+}
+
+.dashboard-template-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-template-meta {
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.dashboard-card-action {
+  width: 100%;
+  margin-top: auto;
+}
+
+.dashboard-product-card time {
+  font-size: 14px;
+}
+
+.dashboard-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.dashboard-account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px;
+  transition:
+    transform var(--app-transition),
+    box-shadow var(--app-transition),
+    border-color var(--app-transition);
+}
+
+.dashboard-account-hero {
+  justify-content: flex-start;
+}
+
+.dashboard-account-avatar {
+  width: 72px;
+  height: 72px;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.dashboard-account-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboard-account-details {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-detail-row {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f6f4ed;
+}
+
+.dashboard-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .app-footer {
   padding: 32px;
 }
@@ -1630,8 +2059,11 @@ body {
   .hero-visual-section,
   .product-showcase-card,
   .login-page-shell,
+  .dashboard-hero-card,
   .template-grid,
   .project-list,
+  .dashboard-template-grid,
+  .dashboard-product-grid,
   .workflow-grid,
   .info-card-grid,
   .app-footer-top,
@@ -1649,6 +2081,30 @@ body {
 
   .login-visual-panel {
     min-height: 460px;
+  }
+
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    gap: 14px;
+    border-right: none;
+    border-bottom: 1px solid rgba(86, 79, 50, 0.12);
+  }
+
+  .dashboard-sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-sidebar-link,
+  .dashboard-account-summary {
+    flex: 1 1 180px;
+  }
+
+  .dashboard-account-summary {
+    margin-top: 0;
   }
 
   .register-page-shell {
@@ -1714,6 +2170,24 @@ body {
     width: min(100%, calc(100% - 24px));
   }
 
+  .dashboard-main {
+    padding: 20px;
+  }
+
+  .dashboard-main-head,
+  .dashboard-section-head,
+  .dashboard-account-actions,
+  .dashboard-metric-grid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-section-card,
+  .dashboard-hero-card {
+    padding: 22px;
+  }
+
   .landing-hero {
     padding-top: 52px;
   }
@@ -1776,16 +2250,25 @@ body {
 
   .hero-highlight-row,
   .project-gate-actions,
-  .auth-session-actions {
+  .auth-session-actions,
+  .dashboard-sidebar-nav,
+  .dashboard-account-actions {
     flex-direction: column;
   }
 
   .hero-highlight-row,
   .project-gate-actions,
   .auth-session-actions,
+  .dashboard-sidebar-nav,
+  .dashboard-account-actions,
   .auth-form-shell,
   .auth-session-card {
     width: 100%;
+  }
+
+  .dashboard-sidebar-link,
+  .dashboard-account-summary {
+    flex: none;
   }
 
   .captcha-placeholder {
