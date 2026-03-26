@@ -176,14 +176,6 @@ export function EditorProvider({ children }) {
             return normalizedFamily;
         }
 
-        if (typeof document !== 'undefined' && document.fonts?.check(`${requestedStyle} ${requestedWeight} 16px "${normalizedFamily}"`)) {
-            loadedFontFacesRef.current.add(fontLoadKey);
-            if (refreshCanvasTextLayout(canvasRef.current, { fontFamily: normalizedFamily })) {
-                canvasRef.current?.requestRenderAll();
-            }
-            return normalizedFamily;
-        }
-
         if (pendingFontLoadsRef.current.has(fontLoadKey)) {
             return pendingFontLoadsRef.current.get(fontLoadKey);
         }
