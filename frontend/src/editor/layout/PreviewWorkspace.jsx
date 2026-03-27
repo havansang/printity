@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from './EditorContext';
 import {
     buildSurfacePreview,
@@ -11,6 +11,9 @@ import {
     canUseMockupPreviewApi,
 } from './mockupPreviewPayload';
 import { previewMockups } from '../../shared/api/mockupApi';
+
+const SERVER_PREVIEW_RESPONSE_CACHE = new Map();
+const SERVER_PREVIEW_REQUEST_CACHE = new Map();
 
 function triggerDownload(href, filename) {
     const anchor = document.createElement('a');
@@ -105,6 +108,34 @@ function mapApiPreviewItems({ response, surfaceDefs, templateDef }) {
         ));
 }
 
+function buildPreviewRequestKey(payload) {
+    return JSON.stringify(payload);
+}
+
+async function requestServerPreview(payload) {
+    const requestKey = buildPreviewRequestKey(payload);
+
+    if (SERVER_PREVIEW_RESPONSE_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_RESPONSE_CACHE.get(requestKey);
+    }
+
+    if (SERVER_PREVIEW_REQUEST_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_REQUEST_CACHE.get(requestKey);
+    }
+
+    const request = previewMockups(payload)
+        .then((response) => {
+            SERVER_PREVIEW_RESPONSE_CACHE.set(requestKey, response);
+            return response;
+        })
+        .finally(() => {
+            SERVER_PREVIEW_REQUEST_CACHE.delete(requestKey);
+        });
+
+    SERVER_PREVIEW_REQUEST_CACHE.set(requestKey, request);
+    return request;
+}
+
 function getOrderedSurfaceDefs(surfaceDefs) {
     const preferredOrder = ['front', 'back', 'neckLabelInner'];
     const orderMap = new Map(preferredOrder.map((surfaceKey, index) => [surfaceKey, index]));
@@ -135,12 +166,89 @@ export default function PreviewWorkspace() {
         templateDef,
     } = useEditor();
 
-    const [previewItems, setPreviewItems] = useState([]);
-    const [selectedSurface, setSelectedSurface] = useState(surfaceDefs[0]?.key || '');
+    const orderedSurfaceDefs = useMemo(() => getOrderedSurfaceDefs(surfaceDefs), [surfaceDefs]);
+    const initialSurfaceKey = orderedSurfaceDefs[0]?.key || '';
+    const [previewItemsBySurface, setPreviewItemsBySurface] = useState({});
+    const previewItemsBySurfaceRef = useRef({});
+    const previewSessionRef = useRef({ id: 0, snapshots: null });
+    const [selectedSurface, setSelectedSurface] = useState(initialSurfaceKey);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingSurface, setLoadingSurface] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [downloadSurface, setDownloadSurface] = useState('');
     const [saveMessage, setSaveMessage] = useState('');
+
+    useEffect(() => {
+        previewItemsBySurfaceRef.current = previewItemsBySurface;
+    }, [previewItemsBySurface]);
+
+    const loadServerSurfacePreview = useCallback(async (surfaceKey, snapshotsOverride = null, sessionIdOverride = null) => {
+        const snapshots = snapshotsOverride || previewSessionRef.current.snapshots;
+        const sessionId = sessionIdOverride ?? previewSessionRef.current.id;
+        const surfaceDef = orderedSurfaceDefs.find((surface) => surface.key === surfaceKey);
+
+        if (!surfaceKey || !surfaceDef || !snapshots) {
+            return null;
+        }
+
+        if (previewItemsBySurfaceRef.current[surfaceKey]) {
+            return previewItemsBySurfaceRef.current[surfaceKey];
+        }
+
+        const payload = await buildMockupPreviewPayload({
+            templateDef,
+            surfaceDef,
+            surfacePrintAreas,
+            snapshots,
+            shirtColor,
+            shirtColors,
+            uploadedImages,
+        });
+
+        if (!payload) {
+            return null;
+        }
+
+        setLoadingSurface(surfaceKey);
+
+        try {
+            const response = await requestServerPreview(payload);
+            const item = mapApiPreviewItems({
+                response,
+                surfaceDefs,
+                templateDef,
+            })[0] || null;
+
+            if (previewSessionRef.current.id !== sessionId || !item) {
+                return item;
+            }
+
+            setPreviewItemsBySurface((current) => {
+                if (current[surfaceKey]) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    [surfaceKey]: item,
+                };
+            });
+
+            return item;
+        } finally {
+            if (previewSessionRef.current.id === sessionId) {
+                setLoadingSurface((current) => (current === surfaceKey ? '' : current));
+            }
+        }
+    }, [
+        orderedSurfaceDefs,
+        shirtColor,
+        shirtColors,
+        surfaceDefs,
+        surfacePrintAreas,
+        templateDef,
+        uploadedImages,
+    ]);
 
     useEffect(() => {
         let cancelled = false;
@@ -153,46 +261,41 @@ export default function PreviewWorkspace() {
 
             try {
                 const snapshots = captureSurfaceSnapshots();
+                const nextInitialSurfaceKey = orderedSurfaceDefs[0]?.key || '';
 
                 if (canUseMockupPreviewApi(templateDef)) {
-                    const orderedSurfaceDefs = getOrderedSurfaceDefs(surfaceDefs);
-                    const loadedItems = [];
+                    const nextSessionId = previewSessionRef.current.id + 1;
+                    previewSessionRef.current = {
+                        id: nextSessionId,
+                        snapshots,
+                    };
+                    previewItemsBySurfaceRef.current = {};
+                    setPreviewItemsBySurface({});
+                    setSelectedSurface((current) => (
+                        orderedSurfaceDefs.some((surface) => surface.key === current)
+                            ? current
+                            : nextInitialSurfaceKey
+                    ));
 
-                    setPreviewItems([]);
-
-                    for (const surfaceDef of orderedSurfaceDefs) {
-                        const payload = await buildMockupPreviewPayload({
-                            templateDef,
-                            surfaceDef,
-                            surfacePrintAreas,
-                            snapshots,
-                            shirtColor,
-                            shirtColors,
-                            uploadedImages,
-                        });
-
-                        if (!payload) {
-                            continue;
+                    if (nextInitialSurfaceKey) {
+                        await loadServerSurfacePreview(nextInitialSurfaceKey, snapshots, nextSessionId);
+                        if (!cancelled && previewSessionRef.current.id === nextSessionId) {
+                            setIsLoading(false);
                         }
 
-                        const response = await previewMockups(payload);
-                        const items = mapApiPreviewItems({
-                            response,
-                            surfaceDefs,
-                            templateDef,
-                        });
+                        for (const surfaceDef of orderedSurfaceDefs) {
+                            if (surfaceDef.key === nextInitialSurfaceKey) {
+                                continue;
+                            }
 
-                        if (cancelled) return;
+                            if (cancelled || previewSessionRef.current.id !== nextSessionId) {
+                                break;
+                            }
 
-                        if (items[0]) {
-                            loadedItems.push(items[0]);
-                            setPreviewItems([...loadedItems]);
-                            setSelectedSurface((current) => (
-                                loadedItems.some((item) => item.surface === current)
-                                    ? current
-                                    : loadedItems[0]?.surface || surfaceDefs[0]?.key || ''
-                            ));
+                            await loadServerSurfacePreview(surfaceDef.key, snapshots, nextSessionId);
                         }
+                    } else if (!cancelled) {
+                        setIsLoading(false);
                     }
                     return;
                 }
@@ -211,12 +314,17 @@ export default function PreviewWorkspace() {
                 }
 
                 objectUrls = fallback.objectUrls;
-                setPreviewItems(fallback.items);
+                const nextPreviewItemsBySurface = Object.fromEntries(
+                    fallback.items.map((item) => [item.surface, item])
+                );
+                previewItemsBySurfaceRef.current = nextPreviewItemsBySurface;
+                setPreviewItemsBySurface(nextPreviewItemsBySurface);
                 setSelectedSurface((current) => (
                     fallback.items.some((item) => item.surface === current)
                         ? current
-                        : fallback.items[0]?.surface || surfaceDefs[0]?.key || ''
+                        : fallback.items[0]?.surface || nextInitialSurfaceKey
                 ));
+                setIsLoading(false);
             } catch (error) {
                 if (!cancelled) {
                     setErrorMessage(error?.message || 'Failed to build preview');
@@ -236,17 +344,37 @@ export default function PreviewWorkspace() {
         };
     }, [
         captureSurfaceSnapshots,
+        loadServerSurfacePreview,
+        orderedSurfaceDefs,
         shirtColor,
         shirtColors,
         uploadedImages,
-        surfaceDefs,
         surfacePrintAreas,
         templateDef,
     ]);
 
+    useEffect(() => {
+        if (!canUseMockupPreviewApi(templateDef)) {
+            return;
+        }
+
+        if (!selectedSurface || previewItemsBySurface[selectedSurface] || !previewSessionRef.current.snapshots) {
+            return;
+        }
+
+        void loadServerSurfacePreview(selectedSurface);
+    }, [loadServerSurfacePreview, previewItemsBySurface, selectedSurface, templateDef]);
+
+    const previewItems = useMemo(
+        () => orderedSurfaceDefs
+            .map((surfaceDef) => previewItemsBySurface[surfaceDef.key])
+            .filter(Boolean),
+        [orderedSurfaceDefs, previewItemsBySurface]
+    );
+
     const selectedItem = useMemo(
-        () => previewItems.find((item) => item.surface === selectedSurface) || previewItems[0] || null,
-        [previewItems, selectedSurface]
+        () => previewItemsBySurface[selectedSurface] || previewItems[0] || null,
+        [previewItems, previewItemsBySurface, selectedSurface]
     );
 
     const handleDownload = async (item) => {
@@ -285,10 +413,10 @@ export default function PreviewWorkspace() {
         <section className="preview-shell" id="preview-workspace">
             <div className="preview-viewer">
                 <div className="preview-stage">
-                    {!selectedItem && isLoading && (
+                    {!selectedItem && (isLoading || loadingSurface === selectedSurface) && (
                         <div className="preview-placeholder">
                             <Spinner />
-                            <span>Rendering mockups...</span>
+                            <span>Rendering mockup...</span>
                         </div>
                     )}
 
@@ -300,7 +428,7 @@ export default function PreviewWorkspace() {
                         />
                     )}
 
-                    {!isLoading && !selectedItem && (
+                    {!isLoading && loadingSurface !== selectedSurface && !selectedItem && (
                         <div className="preview-placeholder">
                             <span>No preview available.</span>
                         </div>
@@ -320,20 +448,28 @@ export default function PreviewWorkspace() {
                 {saveMessage && <p className="preview-status preview-sidebar-message">{saveMessage}</p>}
 
                 <div className="preview-thumb-grid">
-                    {previewItems.map((item) => {
-                        const isActive = item.surface === selectedSurface;
+                    {orderedSurfaceDefs.map((surfaceDef) => {
+                        const item = previewItemsBySurface[surfaceDef.key] || null;
+                        const isActive = surfaceDef.key === selectedSurface;
+                        const isPending = loadingSurface === surfaceDef.key;
 
                         return (
                             <button
-                                key={item.surface}
+                                key={surfaceDef.key}
                                 type="button"
                                 className={`preview-thumb${isActive ? ' active' : ''}`}
-                                onClick={() => setSelectedSurface(item.surface)}
+                                onClick={() => setSelectedSurface(surfaceDef.key)}
                             >
                                 <span className="preview-thumb-frame">
-                                    <img src={item.previewUrl} alt={item.label} />
+                                    {item?.previewUrl ? (
+                                        <img src={item.previewUrl} alt={surfaceDef.label} />
+                                    ) : (
+                                        <span className="preview-thumb-placeholder">
+                                            {isPending ? 'Loading...' : 'Open'}
+                                        </span>
+                                    )}
                                 </span>
-                                <span className="preview-thumb-label">{item.label}</span>
+                                <span className="preview-thumb-label">{surfaceDef.label}</span>
                             </button>
                         );
                     })}

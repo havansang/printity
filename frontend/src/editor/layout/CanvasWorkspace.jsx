@@ -7,6 +7,8 @@ const CANVAS_W = 360;
 const CANVAS_H = 560;
 const CONTROL_GREEN = '#6abf57';
 const CONTROL_BG = '#ffffff';
+const SVG_TEXT_CACHE = new Map();
+const SVG_TEXT_REQUEST_CACHE = new Map();
 
 function renderRotateControl(ctx, left, top, _styleOverride, fabricObject) {
     const size = Math.max(26, Math.min(84, (fabricObject.cornerSize || 10) * 2.6));
@@ -78,7 +80,6 @@ export default function CanvasWorkspace() {
     const fabricRef = useRef(null);
     const rafRef = useRef(null);
     const loadIdRef = useRef(0);
-    const svgSourceCacheRef = useRef(new Map());
     const visualScaleRef = useRef(1);
     const basePrintAreaRef = useRef({ x: 0, y: 0 });
     const pushHistoryRef = useRef(null);
@@ -299,6 +300,38 @@ export default function CanvasWorkspace() {
         if (colorLayer) colorLayer.setAttribute('fill', shirtColor || '#FFFFFF');
     }, [shirtColor]);
 
+    const fetchSvgText = useCallback(async (source) => {
+        const normalizedSource = String(source || '').trim();
+        if (!normalizedSource) {
+            throw new Error('SVG source is required');
+        }
+
+        if (SVG_TEXT_CACHE.has(normalizedSource)) {
+            return SVG_TEXT_CACHE.get(normalizedSource);
+        }
+
+        if (SVG_TEXT_REQUEST_CACHE.has(normalizedSource)) {
+            return SVG_TEXT_REQUEST_CACHE.get(normalizedSource);
+        }
+
+        const request = fetch(normalizedSource)
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load SVG surface: ${activeSurface}`);
+                }
+
+                const text = await response.text();
+                SVG_TEXT_CACHE.set(normalizedSource, text);
+                return text;
+            })
+            .finally(() => {
+                SVG_TEXT_REQUEST_CACHE.delete(normalizedSource);
+            });
+
+        SVG_TEXT_REQUEST_CACHE.set(normalizedSource, request);
+        return request;
+    }, [activeSurface]);
+
     const loadSurfaceSvg = useCallback(async () => {
         const source = activeSurfaceDef?.svg;
         const currentSvgNode = svgRef.current;
@@ -307,15 +340,7 @@ export default function CanvasWorkspace() {
         const loadId = ++loadIdRef.current;
 
         try {
-            let text = svgSourceCacheRef.current.get(source);
-            if (!text) {
-                const res = await fetch(source);
-                if (!res.ok) {
-                    throw new Error(`Failed to load SVG surface: ${activeSurface}`);
-                }
-                text = await res.text();
-                svgSourceCacheRef.current.set(source, text);
-            }
+            const text = await fetchSvgText(source);
             if (loadId !== loadIdRef.current) return;
 
             const parser = new DOMParser();
@@ -335,7 +360,7 @@ export default function CanvasWorkspace() {
         } catch (error) {
             console.error('Failed to load SVG surface', error);
         }
-    }, [activeSurface, activeSurfaceDef, extractPrintAreaFromSvg, queueAlign, setSurfacePrintArea]);
+    }, [activeSurface, activeSurfaceDef, extractPrintAreaFromSvg, fetchSvgText, queueAlign, setSurfacePrintArea]);
 
     useEffect(() => {
         loadSurfaceSvg();

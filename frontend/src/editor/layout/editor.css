@@ -1442,6 +1442,12 @@
   filter: drop-shadow(0 8px 16px rgba(66, 60, 33, 0.14));
 }
 
+.preview-thumb-placeholder {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c775d;
+}
+
 .preview-thumb-label {
   font-size: 12px;
   line-height: 1.45;

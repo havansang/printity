@@ -104,7 +104,7 @@ const defaultTemplates = [
           outputWidth: 2048,
           outputHeight: 2048,
           baseImageUrl: '/mockups/basic-tshirt/back/base.svg',
-          printArea: { x: 1034.29, y: 800, width: 1500, height: 1900 },
+          printArea: { x: 671.5, y: 613, width: 705, height: 893 },
           assets: {
             maskImageUrl: '/mockups/basic-tshirt/back/mask.png',
             shadowImageUrl: '/mockups/basic-tshirt/back/shadow.png',
@@ -120,8 +120,8 @@ const defaultTemplates = [
           },
           displacement: {
             neutral: 128,
-            scaleX: 16,
-            scaleY: 10,
+            scaleX: 0,
+            scaleY: 0,
             blur: 2,
           },
         },
