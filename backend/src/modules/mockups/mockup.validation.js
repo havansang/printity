@@ -5,6 +5,7 @@ const DEBUG_STAGE_KEYS = ['base', 'design', 'masked', 'warped', 'shadowed', 'fin
 const layerSchema = z
   .object({
     id: z.union([z.string(), z.number()]).optional(),
+    assetId: objectIdSchema.optional(),
     x: z.number().optional(),
     y: z.number().optional(),
     angle: z.number().optional(),

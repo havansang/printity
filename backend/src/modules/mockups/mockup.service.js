@@ -6,6 +6,7 @@ const sharp = require('sharp');
 const ApiError = require('../../utils/ApiError');
 const { SURFACE_KEYS } = require('../../constants/product');
 const { getUploadRootAbsolutePath } = require('../../utils/file');
+const Asset = require('../assets/asset.model');
 const { getTextToSvg } = require('../fonts/font.service');
 const { normalizeColorKey, normalizeHex } = require('../templates/template-color.util');
 const { getActiveTemplateById } = require('../templates/template.service');
@@ -13,6 +14,7 @@ const { getActiveTemplateById } = require('../templates/template.service');
 const MOCKUP_ROOT = path.resolve(process.cwd(), 'resources', 'mockups');
 const LOCAL_ASSET_CACHE = new Map();
 const LOCAL_MANIFEST_CACHE = new Map();
+const ASSET_RECORD_CACHE = new Map();
 const FORMAT_ALIASES = {
   jpg: 'jpeg',
 };
@@ -245,7 +247,20 @@ function resolveRequestedSurfaceKeys(template, printPayload, requestedSurfaceKey
 }
 
 function getLocalAbsolutePathFromPublicUrl(assetUrl) {
-  const normalizedUrl = String(assetUrl || '').trim();
+  const normalizedInput = String(assetUrl || '').trim();
+  if (!normalizedInput) {
+    return null;
+  }
+
+  let normalizedUrl = normalizedInput;
+  if (/^https?:\/\//i.test(normalizedInput)) {
+    try {
+      normalizedUrl = new URL(normalizedInput).pathname || normalizedInput;
+    } catch {
+      normalizedUrl = normalizedInput;
+    }
+  }
+
   if (!normalizedUrl) {
     return null;
   }
@@ -443,7 +458,17 @@ async function loadAssetBuffer(assetUrl, hintedMimeType = null) {
       }
     }
 
-    const buffer = await fs.readFile(localAbsolutePath);
+    let buffer;
+    try {
+      buffer = await fs.readFile(localAbsolutePath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        throw new ApiError(500, `Mockup asset not found: ${assetUrl}`);
+      }
+
+      throw error;
+    }
+
     const payload = {
       buffer,
       mimeType: hintedMimeType || getMimeTypeFromFilePath(localAbsolutePath),
@@ -475,6 +500,52 @@ async function loadAssetDataUrl(assetUrl, hintedMimeType = null) {
   }
 
   return bufferToDataUrl(asset.buffer, asset.mimeType);
+}
+
+async function getAssetRecord(assetId) {
+  const normalizedAssetId = String(assetId || '').trim();
+  if (!normalizedAssetId) {
+    return null;
+  }
+
+  if (ASSET_RECORD_CACHE.has(normalizedAssetId)) {
+    return ASSET_RECORD_CACHE.get(normalizedAssetId);
+  }
+
+  const asset = await Asset.findById(normalizedAssetId).lean();
+  const normalizedAsset = asset
+    ? {
+        id: asset._id?.toString() || normalizedAssetId,
+        url: asset.url,
+        mimeType: asset.mimeType,
+        originalName: asset.originalName,
+      }
+    : null;
+
+  ASSET_RECORD_CACHE.set(normalizedAssetId, normalizedAsset);
+  return normalizedAsset;
+}
+
+async function resolveLayerAssetSource(layer) {
+  const assetId = String(layer?.assetId || '').trim();
+  if (assetId) {
+    const asset = await getAssetRecord(assetId);
+    if (!asset?.url) {
+      throw new ApiError(422, `Asset not found for assetId: ${assetId}`);
+    }
+
+    return {
+      assetUrl: asset.url,
+      mimeType: asset.mimeType || layer?.sourceMimeType || layer?.type || null,
+      fileName: asset.originalName || layer?.fileName || null,
+    };
+  }
+
+  return {
+    assetUrl: layer?.src || null,
+    mimeType: layer?.sourceMimeType || layer?.type || null,
+    fileName: layer?.fileName || null,
+  };
 }
 
 async function getAssetMetadata(assetUrl) {
@@ -823,12 +894,12 @@ function buildShapeLayerMarkup(layer, baseWidth, baseHeight) {
 }
 
 async function buildImageLayerMarkup(layer, baseWidth, baseHeight) {
-  if (!layer.src) {
+  const resolvedAsset = await resolveLayerAssetSource(layer);
+  if (!resolvedAsset.assetUrl) {
     return '';
   }
 
-  const hintedMimeType = layer.sourceMimeType || layer.type || null;
-  const href = await loadAssetDataUrl(layer.src, hintedMimeType);
+  const href = await loadAssetDataUrl(resolvedAsset.assetUrl, resolvedAsset.mimeType);
 
   return `
     <image

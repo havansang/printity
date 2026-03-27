@@ -32,9 +32,13 @@ app.use(
     credentials: true,
   }),
 );
-app.use(helmet());
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(helmet({
+  crossOriginResourcePolicy: {
+    policy: 'cross-origin',
+  },
+}));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 if (env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));

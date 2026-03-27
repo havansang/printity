@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, Control, controlsUtils } from 'fabric';
 import { useEditor } from './EditorContext';
 import Positioner from './Positioner';
@@ -78,6 +78,7 @@ export default function CanvasWorkspace() {
     const fabricRef = useRef(null);
     const rafRef = useRef(null);
     const loadIdRef = useRef(0);
+    const svgSourceCacheRef = useRef(new Map());
     const visualScaleRef = useRef(1);
     const basePrintAreaRef = useRef({ x: 0, y: 0 });
     const pushHistoryRef = useRef(null);
@@ -98,7 +99,10 @@ export default function CanvasWorkspace() {
     } = useEditor();
 
     const [svgRevision, setSvgRevision] = useState(0);
-    const activeSurfaceDef = surfaceDefs.find((surface) => surface.key === activeSurface) || null;
+    const activeSurfaceDef = useMemo(
+        () => surfaceDefs.find((surface) => surface.key === activeSurface) || null,
+        [activeSurface, surfaceDefs]
+    );
 
     useEffect(() => {
         pushHistoryRef.current = pushHistory;
@@ -303,11 +307,15 @@ export default function CanvasWorkspace() {
         const loadId = ++loadIdRef.current;
 
         try {
-            const res = await fetch(source);
-            if (!res.ok) {
-                throw new Error(`Failed to load SVG surface: ${activeSurface}`);
+            let text = svgSourceCacheRef.current.get(source);
+            if (!text) {
+                const res = await fetch(source);
+                if (!res.ok) {
+                    throw new Error(`Failed to load SVG surface: ${activeSurface}`);
+                }
+                text = await res.text();
+                svgSourceCacheRef.current.set(source, text);
             }
-            const text = await res.text();
             if (loadId !== loadIdRef.current) return;
 
             const parser = new DOMParser();

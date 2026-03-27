@@ -49,6 +49,15 @@ function buildEditorTemplateDefinition(template) {
             label: surface.label || surfaceKey,
             placeholderId: editor?.placeholderId || `placeholder_${surfaceKey}`,
             printArea: editor?.printArea || surface?.printArea || null,
+            sceneWidth: editor?.sceneWidth || surface?.editor?.sceneWidth || null,
+            sceneHeight: editor?.sceneHeight || surface?.editor?.sceneHeight || null,
+            position: surface?.position || (surfaceKey === 'neckLabelInner' ? 'neck' : surfaceKey),
+            domId: Array.isArray(surface?.domId) ? surface.domId : [],
+            sequence: surface?.sequence ?? 0,
+            printable: surface?.printable !== false,
+            allowedDecorationMethods: Array.isArray(surface?.allowedDecorationMethods)
+                ? surface.allowedDecorationMethods
+                : [],
         };
         nextDefinition.supportedSurfaces.push(surfaceKey);
     });

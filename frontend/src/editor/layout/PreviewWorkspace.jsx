@@ -5,6 +5,12 @@ import {
     createSvgObjectUrl,
     rasterizePreviewSvg,
 } from './previewUtils';
+import {
+    buildMockupFilename,
+    buildMockupPreviewPayload,
+    canUseMockupPreviewApi,
+} from './mockupPreviewPayload';
+import { previewMockups } from '../../shared/api/mockupApi';
 
 function triggerDownload(href, filename) {
     const anchor = document.createElement('a');
@@ -13,12 +19,116 @@ function triggerDownload(href, filename) {
     anchor.click();
 }
 
+async function buildClientPreviewItems({
+    surfaceDefs,
+    snapshots,
+    surfacePrintAreas,
+    shirtColor,
+    templateDef,
+}) {
+    const objectUrls = [];
+    const items = await Promise.all(surfaceDefs.map(async (surfaceDef) => {
+        const surface = surfaceDef.key;
+        const source = surfaceDef.svg;
+
+        if (!source) {
+            return null;
+        }
+
+        const response = await fetch(source);
+        if (!response.ok) {
+            throw new Error(`Failed to load ${surface} template`);
+        }
+
+        const svgText = await response.text();
+        const preview = await buildSurfacePreview({
+            surface,
+            placeholderId: surfaceDef.placeholderId,
+            svgText,
+            snapshot: snapshots?.[surface],
+            printArea: surfacePrintAreas?.[surface],
+            shirtColor,
+        });
+
+        const previewUrl = createSvgObjectUrl(preview.svgMarkup);
+        objectUrls.push(previewUrl);
+
+        return {
+            source: 'client',
+            surface,
+            label: surfaceDef.label,
+            filename: buildMockupFilename({
+                templateDef,
+                surfaceKey: surface,
+                format: 'png',
+                mimeType: 'image/png',
+            }),
+            previewUrl,
+            svgMarkup: preview.svgMarkup,
+            width: preview.width,
+            height: preview.height,
+            mimeType: 'image/png',
+        };
+    }));
+
+    return {
+        items: items.filter(Boolean),
+        objectUrls,
+    };
+}
+
+function mapApiPreviewItems({ response, surfaceDefs, templateDef }) {
+    const previews = Array.isArray(response?.data?.previews) ? response.data.previews : [];
+    const labelsBySurface = new Map(surfaceDefs.map((surfaceDef) => [surfaceDef.key, surfaceDef.label]));
+    const surfaceOrder = new Map(surfaceDefs.map((surfaceDef, index) => [surfaceDef.key, index]));
+
+    return previews
+        .map((preview) => ({
+            source: 'server',
+            surface: preview.surfaceKey,
+            label: labelsBySurface.get(preview.surfaceKey) || preview.surfaceKey,
+            filename: buildMockupFilename({
+                templateDef,
+                surfaceKey: preview.surfaceKey,
+                format: response?.data?.format,
+                mimeType: preview.mimeType,
+            }),
+            previewUrl: preview.dataUrl,
+            dataUrl: preview.dataUrl,
+            width: preview.width,
+            height: preview.height,
+            mimeType: preview.mimeType,
+        }))
+        .sort((left, right) => (
+            (surfaceOrder.get(left.surface) ?? Number.MAX_SAFE_INTEGER)
+            - (surfaceOrder.get(right.surface) ?? Number.MAX_SAFE_INTEGER)
+        ));
+}
+
+function getOrderedSurfaceDefs(surfaceDefs) {
+    const preferredOrder = ['front', 'back', 'neckLabelInner'];
+    const orderMap = new Map(preferredOrder.map((surfaceKey, index) => [surfaceKey, index]));
+
+    return [...surfaceDefs].sort((left, right) => {
+        const leftOrder = orderMap.get(left?.key);
+        const rightOrder = orderMap.get(right?.key);
+
+        if (leftOrder !== undefined || rightOrder !== undefined) {
+            return (leftOrder ?? Number.MAX_SAFE_INTEGER) - (rightOrder ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        return 0;
+    });
+}
+
 export default function PreviewWorkspace() {
     const {
         shirtColor,
+        shirtColors,
         surfaceDefs,
         surfacePrintAreas,
         captureSurfaceSnapshots,
+        uploadedImages,
         hasDesignContent,
         isSavingProduct,
         saveProduct,
@@ -34,7 +144,7 @@ export default function PreviewWorkspace() {
 
     useEffect(() => {
         let cancelled = false;
-        const objectUrls = [];
+        let objectUrls = [];
 
         async function buildPreviews() {
             setIsLoading(true);
@@ -43,51 +153,78 @@ export default function PreviewWorkspace() {
 
             try {
                 const snapshots = captureSurfaceSnapshots();
-                const items = await Promise.all(surfaceDefs.map(async (surfaceDef) => {
-                    const surface = surfaceDef.key;
-                    const source = surfaceDef.svg;
-                    if (!source) return null;
 
-                    const response = await fetch(source);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load ${surface} template`);
+                if (canUseMockupPreviewApi(templateDef)) {
+                    const orderedSurfaceDefs = getOrderedSurfaceDefs(surfaceDefs);
+                    const loadedItems = [];
+
+                    setPreviewItems([]);
+
+                    for (const surfaceDef of orderedSurfaceDefs) {
+                        const payload = await buildMockupPreviewPayload({
+                            templateDef,
+                            surfaceDef,
+                            surfacePrintAreas,
+                            snapshots,
+                            shirtColor,
+                            shirtColors,
+                            uploadedImages,
+                        });
+
+                        if (!payload) {
+                            continue;
+                        }
+
+                        const response = await previewMockups(payload);
+                        const items = mapApiPreviewItems({
+                            response,
+                            surfaceDefs,
+                            templateDef,
+                        });
+
+                        if (cancelled) return;
+
+                        if (items[0]) {
+                            loadedItems.push(items[0]);
+                            setPreviewItems([...loadedItems]);
+                            setSelectedSurface((current) => (
+                                loadedItems.some((item) => item.surface === current)
+                                    ? current
+                                    : loadedItems[0]?.surface || surfaceDefs[0]?.key || ''
+                            ));
+                        }
                     }
+                    return;
+                }
 
-                    const svgText = await response.text();
-                    const preview = await buildSurfacePreview({
-                        surface,
-                        placeholderId: surfaceDef.placeholderId,
-                        svgText,
-                        snapshot: snapshots?.[surface],
-                        printArea: surfacePrintAreas?.[surface],
-                        shirtColor,
-                    });
+                const fallback = await buildClientPreviewItems({
+                    surfaceDefs,
+                    snapshots,
+                    surfacePrintAreas,
+                    shirtColor,
+                    templateDef,
+                });
 
-                    const previewUrl = createSvgObjectUrl(preview.svgMarkup);
-                    objectUrls.push(previewUrl);
+                if (cancelled) {
+                    fallback.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+                    return;
+                }
 
-                    return {
-                        surface,
-                        label: surfaceDef.label,
-                        filename: `${templateDef?.slug || templateDef?.productType || 'product'}-${surface}-preview.png`,
-                        previewUrl,
-                        ...preview,
-                    };
-                }));
-
-                if (cancelled) return;
-
-                const filtered = items.filter(Boolean);
-                setPreviewItems(filtered);
+                objectUrls = fallback.objectUrls;
+                setPreviewItems(fallback.items);
                 setSelectedSurface((current) => (
-                    filtered.some((item) => item.surface === current)
+                    fallback.items.some((item) => item.surface === current)
                         ? current
-                        : filtered[0]?.surface || surfaceDefs[0]?.key || ''
+                        : fallback.items[0]?.surface || surfaceDefs[0]?.key || ''
                 ));
             } catch (error) {
-                if (!cancelled) setErrorMessage(error?.message || 'Failed to build preview');
+                if (!cancelled) {
+                    setErrorMessage(error?.message || 'Failed to build preview');
+                }
             } finally {
-                if (!cancelled) setIsLoading(false);
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             }
         }
 
@@ -97,7 +234,15 @@ export default function PreviewWorkspace() {
             cancelled = true;
             objectUrls.forEach((url) => URL.revokeObjectURL(url));
         };
-    }, [captureSurfaceSnapshots, shirtColor, surfaceDefs, surfacePrintAreas, templateDef]);
+    }, [
+        captureSurfaceSnapshots,
+        shirtColor,
+        shirtColors,
+        uploadedImages,
+        surfaceDefs,
+        surfacePrintAreas,
+        templateDef,
+    ]);
 
     const selectedItem = useMemo(
         () => previewItems.find((item) => item.surface === selectedSurface) || previewItems[0] || null,
@@ -109,6 +254,13 @@ export default function PreviewWorkspace() {
 
         try {
             setDownloadSurface(item.surface);
+            setErrorMessage('');
+
+            if (item.dataUrl) {
+                triggerDownload(item.dataUrl, item.filename);
+                return;
+            }
+
             const pngDataUrl = await rasterizePreviewSvg(item.svgMarkup, {
                 width: item.width,
                 height: item.height,
@@ -133,14 +285,14 @@ export default function PreviewWorkspace() {
         <section className="preview-shell" id="preview-workspace">
             <div className="preview-viewer">
                 <div className="preview-stage">
-                    {isLoading && (
+                    {!selectedItem && isLoading && (
                         <div className="preview-placeholder">
                             <Spinner />
-                            <span>Building previews...</span>
+                            <span>Rendering mockups...</span>
                         </div>
                     )}
 
-                    {!isLoading && !errorMessage && selectedItem && (
+                    {selectedItem && (
                         <img
                             className="preview-stage-image"
                             src={selectedItem.previewUrl}
@@ -148,7 +300,7 @@ export default function PreviewWorkspace() {
                         />
                     )}
 
-                    {!isLoading && !errorMessage && !selectedItem && (
+                    {!isLoading && !selectedItem && (
                         <div className="preview-placeholder">
                             <span>No preview available.</span>
                         </div>
@@ -160,7 +312,7 @@ export default function PreviewWorkspace() {
                 <div className="preview-sidebar-header">
                     <div>
                         <h3>Mockup view</h3>
-                        <p>Select a thumbnail to show it on the left.</p>
+                        <p>Rendered previews are listed here. Select one to inspect it in full size.</p>
                     </div>
                 </div>
 
@@ -174,6 +326,7 @@ export default function PreviewWorkspace() {
                         return (
                             <button
                                 key={item.surface}
+                                type="button"
                                 className={`preview-thumb${isActive ? ' active' : ''}`}
                                 onClick={() => setSelectedSurface(item.surface)}
                             >
@@ -191,18 +344,20 @@ export default function PreviewWorkspace() {
                 <div className="preview-footer-left">
                     {selectedItem && (
                         <button
+                            type="button"
                             className="preview-footer-btn preview-footer-download"
                             onClick={() => handleDownload(selectedItem)}
                             disabled={downloadSurface === selectedItem.surface}
                         >
                             <DownloadIcon />
-                            {downloadSurface === selectedItem.surface ? 'Rendering mockup...' : 'Download mockup'}
+                            {downloadSurface === selectedItem.surface ? 'Preparing download...' : 'Download mockup'}
                         </button>
                     )}
                 </div>
 
                 <div className="preview-footer-right">
                     <button
+                        type="button"
                         className="preview-footer-btn preview-footer-save"
                         onClick={handleSaveProduct}
                         disabled={!hasDesignContent || isSavingProduct}

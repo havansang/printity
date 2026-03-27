@@ -43,13 +43,17 @@ const assetSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-assetSchema.index({ userId: 1, createdAt: -1 });
+assetSchema.index({ userId: 1, deletedAt: 1, createdAt: -1 });
 
 const Asset = mongoose.model('Asset', assetSchema);
 

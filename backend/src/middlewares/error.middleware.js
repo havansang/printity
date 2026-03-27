@@ -40,6 +40,9 @@ function errorMiddleware(error, req, res, next) {
     const duplicateField = Object.keys(error.keyPattern || {})[0] || 'field';
     message = 'Duplicate value';
     errors = [{ field: duplicateField, message: `${duplicateField} already exists` }];
+  } else if (error?.type === 'entity.too.large' || error?.status === 413) {
+    statusCode = 413;
+    message = 'Request payload is too large';
   } else if (error?.message === 'Origin not allowed by CORS') {
     statusCode = 403;
     message = error.message;

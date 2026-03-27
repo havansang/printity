@@ -1,12 +1,18 @@
 import {
-    createContext, useContext, useCallback, useRef, useState, useEffect,
+    createContext, useContext, useCallback, useRef, useState, useEffect, useMemo,
 } from 'react';
 import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
 import { navigate } from '../../app/router';
 import { useAuth } from '../../features/auth/AuthContext';
 import { createProject, updateProject } from '../../features/home/homeApi';
+import {
+    deleteAsset as deleteAssetRequest,
+    fetchAssets,
+    uploadAsset as uploadAssetRequest,
+} from '../../shared/api/assetsApi';
 import { fetchProductColors } from '../../shared/api/colorsApi';
 import { fetchBackendFonts } from '../../shared/api/fontsApi';
+import { resolveRenderableAssetUrl } from '../../shared/lib/assetUrls';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
 import {
     DEFAULT_EDITOR_FONT_FAMILY,
@@ -20,7 +26,20 @@ import {
     normalizeFontWeight,
 } from './editorFonts';
 
-const CUSTOM_PROPS = ['_layerId', '_imageName', '_shapeType', '_layerType'];
+const CUSTOM_PROPS = [
+    '_layerId',
+    '_imageName',
+    'imageName',
+    '_shapeType',
+    '_layerType',
+    'layerType',
+    '_assetId',
+    'assetId',
+    '_assetUrl',
+    'assetUrl',
+    '_sourceMimeType',
+    'sourceMimeType',
+];
 const MAX_HISTORY = 50;
 const AUTO_SAVE_DELAY = 1000;
 const DEFAULT_PRINT_AREA = { x: 0, y: 0, width: 360, height: 560 };
@@ -135,6 +154,27 @@ function normalizeShirtColors(items) {
     return normalized.length > 0 ? normalized : DEFAULT_SHIRT_COLORS;
 }
 
+function normalizeUploadedImageEntry(item) {
+    const id = String(item?.id || '').trim();
+    const originalName = String(item?.originalName || item?.name || 'Image').trim() || 'Image';
+    const url = String(item?.url || '').trim();
+
+    if (!id || !url) {
+        return null;
+    }
+
+    return {
+        id,
+        name: originalName.slice(0, 20),
+        originalName,
+        url,
+        renderUrl: resolveRenderableAssetUrl(url),
+        mimeType: String(item?.mimeType || '').trim() || null,
+        width: Number(item?.width) || null,
+        height: Number(item?.height) || null,
+    };
+}
+
 export function EditorProvider({ children, templateDef: providedTemplateDef, initialProject = null }) {
     const { token } = useAuth();
     const canvasRef = useRef(null);
@@ -144,7 +184,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
 
     /* ---------- template --------------------------------------------- */
     const templateDef = providedTemplateDef || DEFAULT_TEMPLATE_DEF;
-    const surfaceDefs = getTemplateSurfaces(templateDef);
+    const surfaceDefs = useMemo(() => getTemplateSurfaces(templateDef), [templateDef]);
     const surfaceKeys = surfaceDefs.map((surface) => surface.key);
     const initialSurface = surfaceKeys.includes(initialProject?.printPayloadRaw?.activeSurface)
         ? initialProject.printPayloadRaw.activeSurface
@@ -177,6 +217,10 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
 
     /* ---------- uploads gallery -------------------------------------- */
     const [uploadedImages, setUploadedImages] = useState([]);
+    const [uploadedImagesLoading, setUploadedImagesLoading] = useState(false);
+    const [uploadedImagesError, setUploadedImagesError] = useState('');
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [deletingAssetId, setDeletingAssetId] = useState('');
 
     /* ---------- backend font catalog --------------------------------- */
     const [availableFonts, setAvailableFonts] = useState(() => mergeEditorFonts());
@@ -246,6 +290,41 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             isCancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (!token) {
+            setUploadedImages([]);
+            setUploadedImagesLoading(false);
+            setUploadedImagesError('');
+            return undefined;
+        }
+
+        setUploadedImagesLoading(true);
+        setUploadedImagesError('');
+
+        fetchAssets(token)
+            .then((payload) => {
+                if (isCancelled) return;
+                const items = Array.isArray(payload?.data?.items)
+                    ? payload.data.items.map(normalizeUploadedImageEntry).filter(Boolean)
+                    : [];
+                setUploadedImages(items);
+            })
+            .catch((error) => {
+                if (isCancelled) return;
+                setUploadedImages([]);
+                setUploadedImagesError(error?.message || 'Unable to load uploaded assets.');
+            })
+            .finally(() => {
+                if (!isCancelled) setUploadedImagesLoading(false);
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [token]);
 
     const refreshTextObjectLayout = useCallback((obj) => {
         if (!obj || !(obj instanceof IText)) return false;
@@ -886,22 +965,13 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         pushHistory();
     }, [loadFontFamily, refreshTextObjectLayout, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
-    const addImage = useCallback((file) => {
-        const canvas = canvasRef.current;
-        if (!canvas || !file) return;
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const dataUrl = e.target.result;
-            setUploadedImages((prev) => [{ id: _nextId++, name: file.name.slice(0, 20), dataUrl }, ...prev]);
-            _placeImageOnCanvas(dataUrl, file.name.slice(0, 20));
-        };
-        reader.readAsDataURL(file);
-    }, []);
-
-    const _placeImageOnCanvas = useCallback((dataUrl, name) => {
+    const _placeImageOnCanvas = useCallback((imageSource, name, metadata = {}) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const imgEl = new Image();
+        if (/^https?:\/\//i.test(String(imageSource || ''))) {
+            imgEl.crossOrigin = 'anonymous';
+        }
         imgEl.onload = async () => {
             const pa = _getPrintArea();
             const unitScale = _getObjectUnitScale();
@@ -912,7 +982,15 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
                 top: pa.y + 20 * unitScale,
             });
             fabricImg._imageName = name;
+            fabricImg.imageName = name;
             fabricImg._layerType = 'image';
+            fabricImg.layerType = 'image';
+            fabricImg._assetId = metadata.assetId || '';
+            fabricImg.assetId = metadata.assetId || '';
+            fabricImg._assetUrl = metadata.assetUrl || '';
+            fabricImg.assetUrl = metadata.assetUrl || '';
+            fabricImg._sourceMimeType = metadata.sourceMimeType || '';
+            fabricImg.sourceMimeType = metadata.sourceMimeType || '';
             const sourceW = fabricImg.width || 1;
             const sourceH = fabricImg.height || 1;
             const preferredW = pa.width * 0.6;
@@ -933,12 +1011,107 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             syncLayers();
             pushHistory();
         };
-        imgEl.src = dataUrl;
+        imgEl.src = imageSource;
     }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
-    const addImageFromDataUrl = useCallback((dataUrl, name) => {
-        _placeImageOnCanvas(dataUrl, name);
+    const addImage = useCallback(async (file) => {
+        const canvas = canvasRef.current;
+        if (!canvas || !file) {
+            setUploadedImagesError('Editor canvas is not ready yet.');
+            return {
+                ok: false,
+                message: 'Editor canvas is not ready yet.',
+            };
+        }
+
+        if (!token) {
+            setUploadedImagesError('Sign in to upload images to the backend library.');
+            return {
+                ok: false,
+                message: 'Sign in to upload images to the backend library.',
+            };
+        }
+
+        setIsUploadingImage(true);
+        setUploadedImagesError('');
+
+        try {
+            const payload = await uploadAssetRequest(token, file);
+            const normalizedAsset = normalizeUploadedImageEntry(payload?.data);
+
+            if (!normalizedAsset) {
+                throw new Error('Uploaded asset metadata is invalid.');
+            }
+
+            setUploadedImages((prev) => {
+                const nextItems = prev.filter((item) => item.id !== normalizedAsset.id);
+                return [normalizedAsset, ...nextItems];
+            });
+
+            _placeImageOnCanvas(normalizedAsset.renderUrl, normalizedAsset.name, {
+                assetId: normalizedAsset.id,
+                assetUrl: normalizedAsset.url,
+                sourceMimeType: normalizedAsset.mimeType || file.type || '',
+            });
+
+            return {
+                ok: true,
+                asset: normalizedAsset,
+            };
+        } catch (error) {
+            setUploadedImagesError(error?.message || 'Unable to upload image.');
+            return {
+                ok: false,
+                error,
+                message: error?.message || 'Unable to upload image.',
+            };
+        } finally {
+            setIsUploadingImage(false);
+        }
+    }, [_placeImageOnCanvas, token]);
+
+    const addImageFromDataUrl = useCallback((imageSource, name, metadata = {}) => {
+        _placeImageOnCanvas(imageSource, name, metadata);
     }, [_placeImageOnCanvas]);
+
+    const deleteUploadedImage = useCallback(async (assetId) => {
+        const normalizedAssetId = String(assetId || '').trim();
+        if (!normalizedAssetId) {
+            return {
+                ok: false,
+                message: 'Asset id is required.',
+            };
+        }
+
+        if (!token) {
+            setUploadedImagesError('Sign in to delete images from the backend library.');
+            return {
+                ok: false,
+                message: 'Sign in to delete images from the backend library.',
+            };
+        }
+
+        setDeletingAssetId(normalizedAssetId);
+        setUploadedImagesError('');
+
+        try {
+            await deleteAssetRequest(token, normalizedAssetId);
+            setUploadedImages((prev) => prev.filter((item) => item.id !== normalizedAssetId));
+            return {
+                ok: true,
+            };
+        } catch (error) {
+            const message = error?.message || 'Unable to delete image.';
+            setUploadedImagesError(message);
+            return {
+                ok: false,
+                error,
+                message,
+            };
+        } finally {
+            setDeletingAssetId('');
+        }
+    }, [token]);
 
     const addShape = useCallback((shapeType) => {
         const canvas = canvasRef.current;
@@ -1017,8 +1190,26 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         clone.set({ left: active.left + 20, top: active.top + 20 });
         clone._layerId = _nextId++;
         if (active._shapeType) clone._shapeType = active._shapeType;
-        if (active._imageName) clone._imageName = active._imageName;
-        if (active._layerType) clone._layerType = active._layerType;
+        if (active._imageName || active.imageName) {
+            clone._imageName = active._imageName || active.imageName;
+            clone.imageName = active.imageName || active._imageName;
+        }
+        if (active._layerType || active.layerType) {
+            clone._layerType = active._layerType || active.layerType;
+            clone.layerType = active.layerType || active._layerType;
+        }
+        if (active._assetId || active.assetId) {
+            clone._assetId = active._assetId || active.assetId;
+            clone.assetId = active.assetId || active._assetId;
+        }
+        if (active._assetUrl || active.assetUrl) {
+            clone._assetUrl = active._assetUrl || active.assetUrl;
+            clone.assetUrl = active.assetUrl || active._assetUrl;
+        }
+        if (active._sourceMimeType || active.sourceMimeType) {
+            clone._sourceMimeType = active._sourceMimeType || active.sourceMimeType;
+            clone.sourceMimeType = active.sourceMimeType || active._sourceMimeType;
+        }
         canvas.add(clone);
         canvas.setActiveObject(clone);
         canvas.requestRenderAll();
@@ -1122,7 +1313,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         canvasRef,
         layers, selectedLayerId, setSelectedLayerId,
         setCanvas, syncLayers,
-        addText, addImage, addImageFromDataUrl, addShape,
+        addText, addImage, addImageFromDataUrl, deleteUploadedImage, addShape,
         selectLayer, deleteLayer, deleteSelected, duplicateSelected,
         updateObjectTransform, alignObject,
         activeSurface, surfaces: surfaceKeys, surfaceDefs, switchSurface,
@@ -1131,7 +1322,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         textStyle, setSelectedObject, updateTextStyle,
         selectedObjectType,
         availableFonts, fontsLoading, fontsError, loadFontFamily,
-        uploadedImages,
+        uploadedImages, uploadedImagesLoading, uploadedImagesError, isUploadingImage, deletingAssetId,
         shirtColor, setShirtColor,
         shirtColors, shirtColorsLoading, shirtColorsError,
         templateDef,

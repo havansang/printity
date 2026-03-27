@@ -16,8 +16,13 @@ export default function LeftToolbar() {
         addText,
         addImage,
         addImageFromDataUrl,
+        deleteUploadedImage,
         addShape,
         uploadedImages,
+        uploadedImagesLoading,
+        uploadedImagesError,
+        isUploadingImage,
+        deletingAssetId,
         availableFonts,
         fontsLoading,
         fontsError,
@@ -31,20 +36,25 @@ export default function LeftToolbar() {
 
     const toggleTab = (tab) => setActiveTab((previousTab) => (previousTab === tab ? null : tab));
 
-    const handleFileChange = (event) => {
+    const handleSelectedFile = async (file) => {
+        if (!file) return;
+        await addImage(file);
+    };
+
+    const handleFileChange = async (event) => {
         const file = event.target.files?.[0];
         if (file) {
-            addImage(file);
+            await handleSelectedFile(file);
             event.target.value = '';
         }
     };
 
-    const handleDrop = (event) => {
+    const handleDrop = async (event) => {
         event.preventDefault();
         setIsDragging(false);
         const file = event.dataTransfer.files?.[0];
         if (file && file.type.startsWith('image/')) {
-            addImage(file);
+            await handleSelectedFile(file);
         }
     };
 
@@ -85,10 +95,11 @@ export default function LeftToolbar() {
                                         <polyline points="17 8 12 3 7 8" />
                                         <line x1="12" y1="3" x2="12" y2="15" />
                                     </svg>
-                                    <p className="dz-txt">My Device</p>
+                                    <p className="dz-txt">{isUploadingImage ? 'Uploading...' : 'My Device'}</p>
                                     <p className="dz-sub">JPG | PNG | SVG | max 100 MiB</p>
                                 </div>
                                 <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.svg" style={{ display: 'none' }} onChange={handleFileChange} />
+                                {uploadedImagesError && <p className="lib-empty">{uploadedImagesError}</p>}
                             </div>
                         </>
                     )}
@@ -141,21 +152,50 @@ export default function LeftToolbar() {
                                 </button>
                             </div>
                             <div className="lt-panel-body">
-                                {uploadedImages.length === 0 ? (
+                                {uploadedImagesLoading ? (
+                                    <p className="lib-empty">Loading uploaded assets...</p>
+                                ) : uploadedImagesError ? (
+                                    <p className="lib-empty">{uploadedImagesError}</p>
+                                ) : uploadedImages.length === 0 ? (
                                     <p className="lib-empty">No uploads yet. Use the Upload tool to add images.</p>
                                 ) : (
                                     <div className="lib-grid">
                                         {uploadedImages.map((image) => (
-                                            <button
+                                            <div
                                                 key={image.id}
                                                 className="lib-thumb"
                                                 id={`lib-img-${image.id}`}
-                                                title={image.name}
-                                                onClick={() => addImageFromDataUrl(image.dataUrl, image.name)}
                                             >
-                                                <img src={image.dataUrl} alt={image.name} />
-                                                <span>{image.name}</span>
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    className="lib-thumb-delete"
+                                                    aria-label={`Delete ${image.originalName || image.name}`}
+                                                    title={`Delete ${image.originalName || image.name}`}
+                                                    disabled={deletingAssetId === image.id}
+                                                    onClick={async (event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        await deleteUploadedImage(image.id);
+                                                    }}
+                                                >
+                                                    <TrashIcon />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="lib-thumb-select"
+                                                    title={image.originalName || image.name}
+                                                    onClick={() => addImageFromDataUrl(image.renderUrl, image.name, {
+                                                        assetId: image.id,
+                                                        assetUrl: image.url,
+                                                        sourceMimeType: image.mimeType || '',
+                                                    })}
+                                                >
+                                                    <span className="lib-thumb-media">
+                                                        <img src={image.renderUrl} alt={image.originalName || image.name} />
+                                                    </span>
+                                                    <span className="lib-thumb-label">{image.name}</span>
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
@@ -309,3 +349,4 @@ function LibIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill
 function ShapesIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polygon points="12,3 14.5,9.5 21,9.5 16,14 18,21 12,17 6,21 8,14 3,9.5 9.5,9.5" /></svg>; }
 function SearchIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.65" y2="16.65" /></svg>; }
 function CloseIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>; }
+function TrashIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>; }
