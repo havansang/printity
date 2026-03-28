@@ -22,18 +22,23 @@ function EditorShell() {
     return (
         <div className="editor-shell">
             <TopBar />
-            {isPreviewMode ? (
+            <div
+                className={`editor-mode-shell${isPreviewMode ? ' is-hidden' : ' is-active'}`}
+                aria-hidden={isPreviewMode}
+            >
+                <div className="editor-body">
+                    <LeftToolbar />
+                    <CanvasWorkspace />
+                    <RightPanel />
+                </div>
+                <BottomToolbar />
+            </div>
+            <div
+                className={`editor-mode-shell${isPreviewMode ? ' is-active' : ' is-hidden'}`}
+                aria-hidden={!isPreviewMode}
+            >
                 <PreviewWorkspace />
-            ) : (
-                <>
-                    <div className="editor-body">
-                        <LeftToolbar />
-                        <CanvasWorkspace />
-                        <RightPanel />
-                    </div>
-                    <BottomToolbar />
-                </>
-            )}
+            </div>
         </div>
     );
 }

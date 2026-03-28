@@ -2,14 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from './EditorContext';
 import { pickEditorFontVariant } from './editorFonts';
 
-const SHAPES = [
-    { type: 'Star', icon: <StarSVG /> },
-    { type: 'Heart', icon: <HeartSVG /> },
-    { type: 'Underline', icon: <UnderlineSVG /> },
-    { type: 'Triangle', icon: <TriangleSVG /> },
-    { type: 'Circle', icon: <CircleSVG /> },
-    { type: 'Square', icon: <SquareSVG /> },
-];
+const DEFAULT_SHAPE_COLOR_HEX = '#64634A';
 
 export default function LeftToolbar() {
     const {
@@ -27,14 +20,27 @@ export default function LeftToolbar() {
         fontsLoading,
         fontsError,
         loadFontFamily,
+        availableShapes,
+        shapesLoading,
+        shapesError,
+        shapesLoaded,
+        loadAvailableShapes,
     } = useEditor();
 
     const fileInputRef = useRef(null);
     const [activeTab, setActiveTab] = useState(null);
+    const [mountedTabs, setMountedTabs] = useState({});
     const [isDragging, setIsDragging] = useState(false);
     const [fontSearch, setFontSearch] = useState('');
 
-    const toggleTab = (tab) => setActiveTab((previousTab) => (previousTab === tab ? null : tab));
+    const toggleTab = (tab) => {
+        setMountedTabs((previousTabs) => (
+            previousTabs[tab]
+                ? previousTabs
+                : { ...previousTabs, [tab]: true }
+        ));
+        setActiveTab((previousTab) => (previousTab === tab ? null : tab));
+    };
 
     const handleSelectedFile = async (file) => {
         if (!file) return;
@@ -62,6 +68,11 @@ export default function LeftToolbar() {
         availableFonts.filter((font) => font.family.toLowerCase().includes(fontSearch.toLowerCase()))
     ), [availableFonts, fontSearch]);
 
+    useEffect(() => {
+        if (activeTab !== 'shapes' || shapesLoaded || shapesLoading) return;
+        void loadAvailableShapes();
+    }, [activeTab, loadAvailableShapes, shapesLoaded, shapesLoading]);
+
     return (
         <aside className={`left-sidebar${activeTab ? ' expanded' : ''}`} id="left-toolbar">
             <div className="lt-rail">
@@ -71,9 +82,9 @@ export default function LeftToolbar() {
                 <RailBtn id="rail-shapes" label="Graphics" icon={<ShapesIcon />} active={activeTab === 'shapes'} onClick={() => toggleTab('shapes')} />
             </div>
 
-            {activeTab && (
-                <div className="lt-panel" id="lt-panel">
-                    {activeTab === 'upload' && (
+            <div className="lt-panel" id="lt-panel" hidden={!activeTab} aria-hidden={!activeTab}>
+                {mountedTabs.upload && (
+                    <section hidden={activeTab !== 'upload'} aria-hidden={activeTab !== 'upload'}>
                         <>
                             <div className="lt-panel-hdr">
                                 <span>Upload</span>
@@ -102,9 +113,11 @@ export default function LeftToolbar() {
                                 {uploadedImagesError && <p className="lib-empty">{uploadedImagesError}</p>}
                             </div>
                         </>
-                    )}
+                    </section>
+                )}
 
-                    {activeTab === 'text' && (
+                {mountedTabs.text && (
+                    <section hidden={activeTab !== 'text'} aria-hidden={activeTab !== 'text'}>
                         <>
                             <div className="lt-panel-hdr">
                                 <span>Add Text</span>
@@ -141,9 +154,11 @@ export default function LeftToolbar() {
                                 </div>
                             </div>
                         </>
-                    )}
+                    </section>
+                )}
 
-                    {activeTab === 'library' && (
+                {mountedTabs.library && (
+                    <section hidden={activeTab !== 'library'} aria-hidden={activeTab !== 'library'}>
                         <>
                             <div className="lt-panel-hdr">
                                 <span>Library</span>
@@ -201,9 +216,11 @@ export default function LeftToolbar() {
                                 )}
                             </div>
                         </>
-                    )}
+                    </section>
+                )}
 
-                    {activeTab === 'shapes' && (
+                {mountedTabs.shapes && (
+                    <section hidden={activeTab !== 'shapes'} aria-hidden={activeTab !== 'shapes'}>
                         <>
                             <div className="lt-panel-hdr">
                                 <span>Graphics</span>
@@ -212,26 +229,56 @@ export default function LeftToolbar() {
                                 </button>
                             </div>
                             <div className="lt-panel-body">
-                                <div className="shapes-grid">
-                                    {SHAPES.map((shape) => (
-                                        <button
-                                            key={shape.type}
-                                            className="shape-tile"
-                                            id={`shape-${shape.type.toLowerCase()}`}
-                                            title={shape.type}
-                                            onClick={() => addShape(shape.type)}
-                                        >
-                                            {shape.icon}
-                                            <span>{shape.type}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                                {shapesLoading ? (
+                                    <p className="lib-empty">Loading graphics from backend...</p>
+                                ) : shapesError ? (
+                                    <p className="lib-empty">{shapesError}</p>
+                                ) : availableShapes.length === 0 ? (
+                                    <p className="lib-empty">No graphics available yet.</p>
+                                ) : (
+                                    <div className="shapes-grid">
+                                        {availableShapes.map((shape) => (
+                                            <button
+                                                key={shape.id}
+                                                className="shape-tile"
+                                                id={`shape-${shape.slug}`}
+                                                title={shape.name}
+                                                onClick={() => addShape(shape)}
+                                            >
+                                                <ShapePreview shape={shape} />
+                                                <span>{shape.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </>
-                    )}
-                </div>
-            )}
+                    </section>
+                )}
+            </div>
         </aside>
+    );
+}
+
+function ShapePreview({ shape }) {
+    if (shape.previewUrl) {
+        return (
+            <span className="shape-thumb-media">
+                <img src={shape.previewUrl} alt={shape.name} loading="lazy" />
+            </span>
+        );
+    }
+
+    return (
+        <svg
+            className="shape-preview-svg"
+            width="34"
+            height="34"
+            viewBox={`0 0 ${shape.geometry.defaultWidth} ${shape.geometry.defaultHeight}`}
+            aria-hidden="true"
+        >
+            <path d={shape.geometry.pathCommands} fill={DEFAULT_SHAPE_COLOR_HEX} />
+        </svg>
     );
 }
 
@@ -335,13 +382,6 @@ function RailBtn({ id, label, icon, active, onClick }) {
         </button>
     );
 }
-
-function StarSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><polygon points="16,2 19.8,12.2 30.5,12.2 21.9,18.8 25,29 16,22.8 7,29 10.1,18.8 1.5,12.2 12.2,12.2" fill="#4169E1" /></svg>; }
-function HeartSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><path d="M16 28S3 20 3 11.5A7.5 7.5 0 0 1 16 7a7.5 7.5 0 0 1 13 4.5C29 20 16 28 16 28z" fill="#e74c3c" /></svg>; }
-function UnderlineSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><rect x="4" y="22" width="24" height="4" rx="2" fill="#4169E1" /></svg>; }
-function TriangleSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><polygon points="16,4 30,28 2,28" fill="#27ae60" /></svg>; }
-function CircleSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#8e44ad" /></svg>; }
-function SquareSVG() { return <svg width="26" height="26" viewBox="0 0 32 32"><rect x="4" y="4" width="24" height="24" rx="4" fill="#e67e22" /></svg>; }
 
 function UploadIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>; }
 function TextIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>; }

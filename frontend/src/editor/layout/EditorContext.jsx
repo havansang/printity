@@ -1,7 +1,7 @@
 import {
     createContext, useContext, useCallback, useRef, useState, useEffect, useMemo,
 } from 'react';
-import { IText, FabricImage, Circle, Rect, Triangle, Polygon } from 'fabric';
+import { IText, FabricImage, Path } from 'fabric';
 import { navigate } from '../../app/router';
 import { useAuth } from '../../features/auth/AuthContext';
 import { createProject, updateProject } from '../../features/home/homeApi';
@@ -12,6 +12,7 @@ import {
 } from '../../shared/api/assetsApi';
 import { fetchProductColors } from '../../shared/api/colorsApi';
 import { fetchBackendFonts } from '../../shared/api/fontsApi';
+import { fetchShapes } from '../../shared/api/shapesApi';
 import { resolveRenderableAssetUrl } from '../../shared/lib/assetUrls';
 import { getTemplateSurfaces, templates } from '../../templates/templates';
 import {
@@ -39,6 +40,14 @@ const CUSTOM_PROPS = [
     'assetUrl',
     '_sourceMimeType',
     'sourceMimeType',
+    '_shapeSlug',
+    'shapeSlug',
+    '_shapePathCommands',
+    'shapePathCommands',
+    '_shapeSourceWidth',
+    'shapeSourceWidth',
+    '_shapeSourceHeight',
+    'shapeSourceHeight',
 ];
 const MAX_HISTORY = 50;
 const AUTO_SAVE_DELAY = 1000;
@@ -51,6 +60,7 @@ const DEFAULT_TEMPLATE_KEY = 'tshirt';
 const DEFAULT_TEMPLATE_DEF = templates[DEFAULT_TEMPLATE_KEY] || {};
 const BACKEND_TEMPLATE_ID_PATTERN = /^[a-f\d]{24}$/i;
 const DEFAULT_SHIRT_COLOR_HEX = '#FFFFFF';
+const DEFAULT_SHAPE_COLOR_HEX = '#64634A';
 
 const EditorContext = createContext(null);
 let _nextId = 1;
@@ -175,6 +185,33 @@ function normalizeUploadedImageEntry(item) {
     };
 }
 
+function normalizeShapeEntry(item) {
+    const id = String(item?.id || '').trim();
+    const name = String(item?.name || '').trim();
+    const slug = String(item?.slug || '').trim().toLowerCase();
+    const pathCommands = String(item?.geometry?.pathCommands || '').trim();
+    const defaultWidth = Number(item?.geometry?.defaultWidth);
+    const defaultHeight = Number(item?.geometry?.defaultHeight);
+
+    if (!id || !name || !slug || !pathCommands || defaultWidth <= 0 || defaultHeight <= 0) {
+        return null;
+    }
+
+    return {
+        id,
+        name,
+        slug,
+        group: String(item?.group || 'basic').trim().toLowerCase() || 'basic',
+        tags: Array.isArray(item?.tags) ? item.tags.map((tag) => String(tag || '').trim()).filter(Boolean) : [],
+        previewUrl: String(item?.previewUrl || '').trim() || null,
+        geometry: {
+            pathCommands,
+            defaultWidth,
+            defaultHeight,
+        },
+    };
+}
+
 export function EditorProvider({ children, templateDef: providedTemplateDef, initialProject = null }) {
     const { token } = useAuth();
     const canvasRef = useRef(null);
@@ -229,6 +266,14 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
     const [fontsError, setFontsError] = useState('');
     const loadedFontFacesRef = useRef(new Set());
     const pendingFontLoadsRef = useRef(new Map());
+
+    /* ---------- backend shapes catalog ------------------------------- */
+    const [availableShapes, setAvailableShapes] = useState([]);
+    const [shapesLoading, setShapesLoading] = useState(false);
+    const [shapesError, setShapesError] = useState('');
+    const [shapesLoaded, setShapesLoaded] = useState(false);
+    const hasLoadedShapesRef = useRef(false);
+    const pendingShapesLoadRef = useRef(null);
 
     /* ---------- selected object type --------------------------------- */
     const [selectedObjectType, setSelectedObjectType] = useState(null);
@@ -429,6 +474,44 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             isCancelled = true;
         };
     }, [loadFontFamily]);
+
+    const loadAvailableShapes = useCallback(async ({ force = false } = {}) => {
+        if (!force && hasLoadedShapesRef.current) {
+            return availableShapes;
+        }
+
+        if (pendingShapesLoadRef.current) {
+            return pendingShapesLoadRef.current;
+        }
+
+        setShapesLoading(true);
+        setShapesError('');
+
+        const request = fetchShapes({ activeOnly: true })
+            .then((payload) => {
+                const items = Array.isArray(payload?.data?.items)
+                    ? payload.data.items.map(normalizeShapeEntry).filter(Boolean)
+                    : [];
+                hasLoadedShapesRef.current = true;
+                setAvailableShapes(items);
+                setShapesLoaded(true);
+                return items;
+            })
+            .catch((error) => {
+                hasLoadedShapesRef.current = false;
+                setAvailableShapes([]);
+                setShapesLoaded(false);
+                setShapesError(error?.message || 'Unable to load graphics from the API.');
+                return [];
+            })
+            .finally(() => {
+                pendingShapesLoadRef.current = null;
+                setShapesLoading(false);
+            });
+
+        pendingShapesLoadRef.current = request;
+        return request;
+    }, [availableShapes]);
 
     /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -1113,56 +1196,60 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         }
     }, [token]);
 
-    const addShape = useCallback((shapeType) => {
+    const addShape = useCallback((shapeInput) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+
+        const shapeRecord = typeof shapeInput === 'object' && shapeInput?.geometry?.pathCommands
+            ? shapeInput
+            : availableShapes.find((item) => (
+                item.slug === String(shapeInput || '').trim().toLowerCase()
+                || item.name.toLowerCase() === String(shapeInput || '').trim().toLowerCase()
+            ));
+
+        if (!shapeRecord?.geometry?.pathCommands) {
+            return;
+        }
+
         const pa = _getPrintArea();
         const unitScale = _getObjectUnitScale();
-        const largeSize = 100 * unitScale;
-        const mediumSize = 90 * unitScale;
-        const cornerRadius = Math.max(2, 6 * unitScale);
         const baseOpts = {
             left: pa.x + 40 * unitScale + Math.random() * 80 * unitScale,
             top: pa.y + 40 * unitScale + Math.random() * 80 * unitScale,
-            fill: '#4169E1', stroke: null, strokeWidth: 0,
+            fill: DEFAULT_SHAPE_COLOR_HEX,
+            stroke: null,
+            strokeWidth: 0,
+            originX: 'left',
+            originY: 'top',
         };
-        let shape;
-        switch (shapeType) {
-            case 'Circle': shape = new Circle({ ...baseOpts, radius: (largeSize / 2) }); break;
-            case 'Square': shape = new Rect({
-                ...baseOpts, width: largeSize, height: largeSize, rx: cornerRadius, ry: cornerRadius,
-            }); break;
-            case 'Triangle': shape = new Triangle({ ...baseOpts, width: largeSize, height: mediumSize }); break;
-            case 'Star': {
-                const pts = [];
-                for (let i = 0; i < 10; i++) {
-                    const r = i % 2 === 0 ? (50 * unitScale) : (22 * unitScale);
-                    const a = (Math.PI / 5) * i - Math.PI / 2;
-                    pts.push({ x: r * Math.cos(a), y: r * Math.sin(a) });
-                }
-                shape = new Polygon(pts, { ...baseOpts }); break;
-            }
-            case 'Heart': {
-                const pts = [];
-                for (let t = 0; t <= 360; t += 6) {
-                    const r = (t * Math.PI) / 180;
-                    pts.push({ x: 16 * Math.pow(Math.sin(r), 3), y: -(13 * Math.cos(r) - 5 * Math.cos(2 * r) - 2 * Math.cos(3 * r) - Math.cos(4 * r)) });
-                }
-                shape = new Polygon(pts, { ...baseOpts, scaleX: 3 * unitScale, scaleY: 3 * unitScale }); break;
-            }
-            case 'Underline': shape = new Rect({
-                ...baseOpts, width: 160 * unitScale, height: 8 * unitScale, rx: 4 * unitScale, ry: 4 * unitScale,
-            }); break;
-            default: shape = new Rect({ ...baseOpts, width: largeSize, height: largeSize });
-        }
-        shape._shapeType = shapeType;
+
+        const shape = new Path(shapeRecord.geometry.pathCommands, baseOpts);
+        const sourceWidth = Math.max(1, Number(shape.width) || 1);
+        const sourceHeight = Math.max(1, Number(shape.height) || 1);
+        const dominantDimension = Math.max(sourceWidth, sourceHeight);
+        const targetSize = Math.max(48, 120 * unitScale);
+        const nextScale = targetSize / dominantDimension;
+
+        shape.set({
+            scaleX: nextScale,
+            scaleY: nextScale,
+        });
+        shape._shapeType = shapeRecord.name;
+        shape._shapeSlug = shapeRecord.slug;
+        shape.shapeSlug = shapeRecord.slug;
+        shape._shapePathCommands = shapeRecord.geometry.pathCommands;
+        shape.shapePathCommands = shapeRecord.geometry.pathCommands;
+        shape._shapeSourceWidth = sourceWidth;
+        shape.shapeSourceWidth = sourceWidth;
+        shape._shapeSourceHeight = sourceHeight;
+        shape.shapeSourceHeight = sourceHeight;
         shape._layerType = 'shape';
         canvas.add(shape);
         canvas.setActiveObject(shape);
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
-    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
+    }, [availableShapes, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     /* ── delete / duplicate ──────────────────────────────────────── */
 
@@ -1190,6 +1277,22 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         clone.set({ left: active.left + 20, top: active.top + 20 });
         clone._layerId = _nextId++;
         if (active._shapeType) clone._shapeType = active._shapeType;
+        if (active._shapeSlug || active.shapeSlug) {
+            clone._shapeSlug = active._shapeSlug || active.shapeSlug;
+            clone.shapeSlug = active.shapeSlug || active._shapeSlug;
+        }
+        if (active._shapePathCommands || active.shapePathCommands) {
+            clone._shapePathCommands = active._shapePathCommands || active.shapePathCommands;
+            clone.shapePathCommands = active.shapePathCommands || active._shapePathCommands;
+        }
+        if (active._shapeSourceWidth || active.shapeSourceWidth) {
+            clone._shapeSourceWidth = active._shapeSourceWidth || active.shapeSourceWidth;
+            clone.shapeSourceWidth = active.shapeSourceWidth || active._shapeSourceWidth;
+        }
+        if (active._shapeSourceHeight || active.shapeSourceHeight) {
+            clone._shapeSourceHeight = active._shapeSourceHeight || active.shapeSourceHeight;
+            clone.shapeSourceHeight = active.shapeSourceHeight || active._shapeSourceHeight;
+        }
         if (active._imageName || active.imageName) {
             clone._imageName = active._imageName || active.imageName;
             clone.imageName = active.imageName || active._imageName;
@@ -1322,6 +1425,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         textStyle, setSelectedObject, updateTextStyle,
         selectedObjectType,
         availableFonts, fontsLoading, fontsError, loadFontFamily,
+        availableShapes, shapesLoading, shapesError, shapesLoaded, loadAvailableShapes,
         uploadedImages, uploadedImagesLoading, uploadedImagesError, isUploadingImage, deletingAssetId,
         shirtColor, setShirtColor,
         shirtColors, shirtColorsLoading, shirtColorsError,

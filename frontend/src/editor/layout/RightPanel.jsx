@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { useEditor } from './EditorContext';
 
+const DEFAULT_SHAPE_COLOR_HEX = '#64634A';
+
 const ALIGN_TOOLS = [
     { key: 'left', label: 'Align Left', icon: <AlignHLeft /> },
     { key: 'right', label: 'Align Right', icon: <AlignHRight /> },
@@ -203,7 +205,7 @@ export default function RightPanel() {
                                             <>
                                                 <PropRow label="Color">
                                                     <input type="color" className="prop-color" id={`prop-color-${layer.id}`}
-                                                        value={(props.fill ?? '#4169E1').startsWith('#') ? (props.fill) : '#4169E1'}
+                                                        value={(props.fill ?? DEFAULT_SHAPE_COLOR_HEX).startsWith('#') ? (props.fill) : DEFAULT_SHAPE_COLOR_HEX}
                                                         onChange={(e) => updateObjectTransform(layer.id, { fill: e.target.value })} />
                                                 </PropRow>
                                                 <PropRow label="Width">

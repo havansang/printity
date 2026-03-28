@@ -2,10 +2,12 @@ import {
     Circle,
     FabricImage,
     IText,
+    Path,
     Polygon,
     Rect,
     StaticCanvas,
     Triangle,
+    util,
 } from 'fabric';
 
 const BACKEND_TEMPLATE_ID_PATTERN = /^[a-f\d]{24}$/i;
@@ -272,25 +274,60 @@ function serializeShapeStroke(object) {
     };
 }
 
+function scalePathCommands(pathCommands, sourceWidth, sourceHeight, targetWidth, targetHeight) {
+    const normalizedPathCommands = String(pathCommands || '').trim();
+    if (!normalizedPathCommands) {
+        return '';
+    }
+
+    const safeSourceWidth = Math.max(1, Number(sourceWidth) || 1);
+    const safeSourceHeight = Math.max(1, Number(sourceHeight) || 1);
+    const safeTargetWidth = Math.max(1, Number(targetWidth) || 1);
+    const safeTargetHeight = Math.max(1, Number(targetHeight) || 1);
+    const scaleX = safeTargetWidth / safeSourceWidth;
+    const scaleY = safeTargetHeight / safeSourceHeight;
+
+    if (Math.abs(scaleX - 1) < 0.0001 && Math.abs(scaleY - 1) < 0.0001) {
+        return normalizedPathCommands;
+    }
+
+    const parsedPath = util.makePathSimpler(util.parsePath(normalizedPathCommands));
+    const transformedPath = util.transformPath(
+        parsedPath,
+        [scaleX, 0, 0, scaleY, 0, 0],
+    );
+
+    return util.joinPath(transformedPath, 3);
+}
+
 function serializeShapeObject(object, printArea, objectIndex, snapshotObject) {
     const dimensions = getScaledDimensions(object);
     const base = getLayerBasePayload(object, printArea, snapshotObject);
     const scaleX = getAbsoluteScale(object?.scaleX);
     const scaleY = getAbsoluteScale(object?.scaleY);
+    const rawType = String(object?.type || '').toLowerCase();
     let pathCommands = '';
 
-    if (object instanceof Rect || String(object?.type || '').toLowerCase() === 'rect') {
+    if (object instanceof Path || rawType === 'path') {
+        pathCommands = scalePathCommands(
+            resolveObjectCustomProp(object, snapshotObject, '_shapePathCommands', 'shapePathCommands'),
+            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceWidth', 'shapeSourceWidth'),
+            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceHeight', 'shapeSourceHeight'),
+            dimensions.width,
+            dimensions.height,
+        );
+    } else if (object instanceof Rect || rawType === 'rect') {
         pathCommands = createRoundedRectPath(
             dimensions.width,
             dimensions.height,
             roundFloat((Number(object?.rx) || 0) * scaleX, 3),
             roundFloat((Number(object?.ry) || 0) * scaleY, 3)
         );
-    } else if (object instanceof Circle || String(object?.type || '').toLowerCase() === 'circle') {
+    } else if (object instanceof Circle || rawType === 'circle') {
         pathCommands = createEllipsePath(dimensions.width, dimensions.height);
-    } else if (object instanceof Triangle || String(object?.type || '').toLowerCase() === 'triangle') {
+    } else if (object instanceof Triangle || rawType === 'triangle') {
         pathCommands = createTrianglePath(dimensions.width, dimensions.height);
-    } else if (object instanceof Polygon || String(object?.type || '').toLowerCase() === 'polygon') {
+    } else if (object instanceof Polygon || rawType === 'polygon') {
         pathCommands = createPolygonPath(object?.points || [], dimensions.width, dimensions.height);
     }
 

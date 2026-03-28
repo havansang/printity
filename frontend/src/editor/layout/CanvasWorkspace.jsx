@@ -464,6 +464,12 @@ export default function CanvasWorkspace() {
     }, [activeSurface, svgRevision, queueAlign]);
 
     useEffect(() => {
+        if (!isPreviewMode) {
+            queueAlign();
+        }
+    }, [isPreviewMode, queueAlign]);
+
+    useEffect(() => {
         const sceneEl = sceneRef.current;
         const svgEl = svgRef.current;
         if (!sceneEl || !svgEl) return;

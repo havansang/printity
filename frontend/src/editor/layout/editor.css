@@ -50,6 +50,17 @@
   font-size: 13px;
 }
 
+.editor-mode-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-mode-shell.is-hidden {
+  display: none;
+}
+
 .editor-body {
   display: flex;
   flex: 1;
@@ -648,6 +659,36 @@
 
 .shape-tile:active {
   transform: scale(0.95);
+}
+
+.shape-thumb-media {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.lt-panel[hidden] {
+  display: none;
+}
+
+.lt-panel > section[hidden] {
+  display: none;
+}
+
+.shape-thumb-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.shape-preview-svg {
+  width: 38px;
+  height: 38px;
+  display: block;
 }
 
 /* =================================================================== */
