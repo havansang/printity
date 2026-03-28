@@ -14,6 +14,7 @@ const DEFAULT_TEMPLATE_DEF = {
     name: 'Basic T-shirt',
     productType: 'tshirt',
     slug: 'basic-tshirt',
+    availableColors: [],
 };
 
 function buildEditorTemplateDefinition(template) {
@@ -31,6 +32,7 @@ function buildEditorTemplateDefinition(template) {
         name: template.name || 'Product editor',
         productType: template.productType || 'tshirt',
         slug: template.slug || '',
+        availableColors: Array.isArray(template?.availableColors) ? template.availableColors : [],
         defaultRenderOptions: template.defaultRenderOptions || null,
         supportedSurfaces: [],
     };

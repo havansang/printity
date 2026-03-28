@@ -307,11 +307,26 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
 
     useEffect(() => {
         let isCancelled = false;
+        const templateColorItems = Array.isArray(templateDef?.availableColors)
+            ? templateDef.availableColors
+            : [];
 
         setShirtColorsLoading(true);
         setShirtColorsError('');
 
-        fetchProductColors()
+        if (templateColorItems.length > 0) {
+            const nextColors = normalizeShirtColors(templateColorItems);
+            setShirtColors(nextColors);
+            setShirtColor((currentValue) => (
+                nextColors.some((color) => color.hex === currentValue)
+                    ? currentValue
+                    : (nextColors[0]?.hex || DEFAULT_SHIRT_COLOR_HEX)
+            ));
+            setShirtColorsLoading(false);
+            return undefined;
+        }
+
+        fetchProductColors({ productType: templateDef?.productType })
             .then((payload) => {
                 if (isCancelled) return;
                 const nextColors = normalizeShirtColors(payload?.data?.items);
@@ -334,7 +349,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         return () => {
             isCancelled = true;
         };
-    }, []);
+    }, [templateDef?.availableColors, templateDef?.productType]);
 
     useEffect(() => {
         let isCancelled = false;
