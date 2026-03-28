@@ -546,7 +546,6 @@ export default function CanvasWorkspace() {
             syncLayersRef.current?.();
             pushHistoryRef.current?.();
         };
-        const onTextChanged = () => { const a = canvas.getActiveObject(); setSelectedObject(a ?? null); };
         const onTextEditingExited = () => {
             syncLayersRef.current?.();
             pushHistoryRef.current?.();
@@ -563,7 +562,6 @@ export default function CanvasWorkspace() {
         canvas.on('selection:cleared', onCleared);
         canvas.on('mouse:down', onMouseDown);
         canvas.on('object:modified', onModified);
-        canvas.on('text:changed', onTextChanged);
         canvas.on('text:editing:entered', onTextEditingEntered);
         canvas.on('text:editing:exited', onTextEditingExited);
         const onObjectAdded = (e) => {
@@ -585,7 +583,6 @@ export default function CanvasWorkspace() {
             canvas.off('selection:cleared', onCleared);
             canvas.off('mouse:down', onMouseDown);
             canvas.off('object:modified', onModified);
-            canvas.off('text:changed', onTextChanged);
             canvas.off('text:editing:entered', onTextEditingEntered);
             canvas.off('text:editing:exited', onTextEditingExited);
             canvas.off('object:added', onObjectAdded);

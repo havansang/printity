@@ -408,9 +408,6 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         const fontLoadKey = createFontLoadKey(normalizedFamily, requestedWeight, requestedStyle);
 
         if (loadedFontFacesRef.current.has(fontLoadKey)) {
-            if (refreshCanvasTextLayout(canvasRef.current, { fontFamily: normalizedFamily })) {
-                canvasRef.current?.requestRenderAll();
-            }
             return normalizedFamily;
         }
 
@@ -444,6 +441,22 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         pendingFontLoadsRef.current.set(fontLoadKey, loadPromise);
         return loadPromise;
     }, [refreshCanvasTextLayout]);
+
+    const ensureFontFamilyLoaded = useCallback((fontFamily, options = {}) => {
+        const normalizedFamily = normalizeFontFamily(fontFamily);
+        const requestedWeight = normalizeFontWeight(options.fontWeight);
+        const requestedStyle = normalizeFontStyle(options.fontStyle);
+        const fontLoadKey = createFontLoadKey(normalizedFamily, requestedWeight, requestedStyle);
+
+        if (loadedFontFacesRef.current.has(fontLoadKey) || pendingFontLoadsRef.current.has(fontLoadKey)) {
+            return null;
+        }
+
+        return loadFontFamily(normalizedFamily, {
+            fontWeight: requestedWeight,
+            fontStyle: requestedStyle,
+        });
+    }, [loadFontFamily]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -631,7 +644,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             return;
         }
         const normalizedFamily = normalizeFontFamily(obj.fontFamily);
-        void loadFontFamily(normalizedFamily, {
+        void ensureFontFamilyLoaded(normalizedFamily, {
             fontWeight: obj.fontWeight,
             fontStyle: obj.fontStyle,
         });
@@ -644,7 +657,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             textAlign: obj.textAlign ?? 'left',
             isText: true,
         });
-    }, [loadFontFamily]);
+    }, [ensureFontFamilyLoaded]);
 
     const _detectObjectType = useCallback((obj) => {
         if (!obj) { setSelectedObjectType(null); return; }
