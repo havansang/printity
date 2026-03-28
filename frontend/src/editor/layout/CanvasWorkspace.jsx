@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, Control, controlsUtils } from 'fabric';
+import { Canvas, Control, IText, Point, controlsUtils } from 'fabric';
 import { useEditor } from './EditorContext';
 import Positioner from './Positioner';
 
@@ -9,6 +9,100 @@ const CONTROL_GREEN = '#6abf57';
 const CONTROL_BG = '#ffffff';
 const SVG_TEXT_CACHE = new Map();
 const SVG_TEXT_REQUEST_CACHE = new Map();
+const TEXTAREA_PATCH_FLAG = '__editorViewportTextareaPatch';
+
+function getViewportTextareaPosition(textObj) {
+    const canvas = textObj?.canvas;
+    const upperCanvas = canvas?.upperCanvasEl;
+
+    if (!canvas || !upperCanvas) {
+        return {
+            left: '1px',
+            top: '1px',
+            fontSize: '1px',
+            charHeight: 1,
+        };
+    }
+
+    const desiredPosition = textObj.inCompositionMode
+        ? textObj.compositionStart
+        : textObj.selectionStart;
+    const boundaries = textObj._getCursorBoundaries(desiredPosition);
+    const cursorLocation = textObj.get2DCursorLocation(desiredPosition);
+    const lineIndex = cursorLocation.lineIndex;
+    const charIndex = cursorLocation.charIndex;
+    const rawFontSize = Number(textObj.getValueOfPropertyAt(lineIndex, charIndex, 'fontSize'))
+        || Number(textObj.fontSize)
+        || 16;
+    const lineHeight = Number(textObj.lineHeight) || 1;
+    const charHeight = Math.max(1, rawFontSize * lineHeight);
+    const retinaScaling = textObj.getCanvasRetinaScaling?.() || 1;
+    const upperCanvasWidth = upperCanvas.width / retinaScaling || upperCanvas.clientWidth || 1;
+    const upperCanvasHeight = upperCanvas.height / retinaScaling || upperCanvas.clientHeight || 1;
+    const canvasClientWidth = upperCanvas.clientWidth || upperCanvasWidth;
+    const canvasClientHeight = upperCanvas.clientHeight || upperCanvasHeight;
+    const displayRect = upperCanvas.getBoundingClientRect();
+    const displayWidth = displayRect.width || canvasClientWidth || upperCanvasWidth;
+    const displayHeight = displayRect.height || canvasClientHeight || upperCanvasHeight;
+    const renderScaleX = displayWidth / upperCanvasWidth || 1;
+    const renderScaleY = displayHeight / upperCanvasHeight || 1;
+    const maxWidth = Math.max(0, upperCanvasWidth - charHeight);
+    const maxHeight = Math.max(0, upperCanvasHeight - charHeight);
+
+    const point = new Point(
+        boundaries.left + boundaries.leftOffset,
+        boundaries.top + boundaries.topOffset + charHeight,
+    )
+        .transform(textObj.calcTransformMatrix())
+        .transform(canvas.viewportTransform)
+        .multiply(new Point(
+            canvasClientWidth / upperCanvasWidth,
+            canvasClientHeight / upperCanvasHeight,
+        ));
+
+    const clampedCanvasX = Math.min(Math.max(point.x, 0), maxWidth);
+    const clampedCanvasY = Math.min(Math.max(point.y, 0), maxHeight);
+    const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
+    const viewportWidth = viewport?.width || window.innerWidth || displayWidth || 1;
+    const viewportHeight = viewport?.height || window.innerHeight || displayHeight || 1;
+    const viewportOffsetLeft = viewport?.offsetLeft || 0;
+    const viewportOffsetTop = viewport?.offsetTop || 0;
+    const nextLeft = Math.min(
+        Math.max(displayRect.left + viewportOffsetLeft + clampedCanvasX * renderScaleX, viewportOffsetLeft + 1),
+        viewportOffsetLeft + viewportWidth - 2,
+    );
+    const nextTop = Math.min(
+        Math.max(displayRect.top + viewportOffsetTop + clampedCanvasY * renderScaleY, viewportOffsetTop + 1),
+        viewportOffsetTop + viewportHeight - 2,
+    );
+    const nextFontSize = Math.max(1, rawFontSize * renderScaleY);
+
+    return {
+        left: `${nextLeft}px`,
+        top: `${nextTop}px`,
+        fontSize: `${nextFontSize}px`,
+        charHeight: nextFontSize,
+    };
+}
+
+function applyViewportTextareaStyles(textObj) {
+    const textarea = textObj?.hiddenTextarea;
+    if (!textarea) return;
+
+    const style = getViewportTextareaPosition(textObj);
+
+    textarea.style.position = 'fixed';
+    textarea.style.left = style.left;
+    textarea.style.top = style.top;
+    textarea.style.width = '1px';
+    textarea.style.height = '1px';
+    textarea.style.margin = '0';
+    textarea.style.paddingTop = style.fontSize;
+    textarea.style.border = '0';
+    textarea.style.opacity = '0';
+    textarea.style.zIndex = '-999';
+    textarea.style.transform = 'none';
+}
 
 function renderRotateControl(ctx, left, top, _styleOverride, fabricObject) {
     const size = Math.max(26, Math.min(84, (fabricObject.cornerSize || 10) * 2.6));
@@ -300,6 +394,61 @@ export default function CanvasWorkspace() {
         if (colorLayer) colorLayer.setAttribute('fill', shirtColor || '#FFFFFF');
     }, [shirtColor]);
 
+    const getTextEditingContainer = useCallback(() => {
+        if (typeof document === 'undefined') {
+            return null;
+        }
+
+        return document.body || null;
+    }, []);
+
+    const assignTextEditingContainer = useCallback((targetObj = null) => {
+        const container = getTextEditingContainer();
+        const canvas = fabricRef.current;
+        if (!container || !canvas) return;
+
+        const assignToObject = (obj) => {
+            if (!(obj instanceof IText)) return;
+            obj.hiddenTextareaContainer = container;
+
+            if (obj[TEXTAREA_PATCH_FLAG]) {
+                applyViewportTextareaStyles(obj);
+                return;
+            }
+
+            const originalInitHiddenTextarea = obj.initHiddenTextarea?.bind(obj);
+            const originalUpdateTextareaPosition = obj.updateTextareaPosition?.bind(obj);
+
+            obj._calcTextareaPosition = function patchedCalcTextareaPosition() {
+                return getViewportTextareaPosition(this);
+            };
+
+            obj.initHiddenTextarea = function patchedInitHiddenTextarea(...args) {
+                if (typeof originalInitHiddenTextarea === 'function') {
+                    originalInitHiddenTextarea(...args);
+                }
+                applyViewportTextareaStyles(this);
+            };
+
+            obj.updateTextareaPosition = function patchedUpdateTextareaPosition(...args) {
+                if (typeof originalUpdateTextareaPosition === 'function') {
+                    originalUpdateTextareaPosition(...args);
+                }
+                applyViewportTextareaStyles(this);
+            };
+
+            obj[TEXTAREA_PATCH_FLAG] = true;
+        };
+
+        if (targetObj) {
+            assignToObject(targetObj);
+            return;
+        }
+
+        canvas.getObjects().forEach(assignToObject);
+        assignToObject(canvas.getActiveObject());
+    }, [getTextEditingContainer]);
+
     const fetchSvgText = useCallback(async (source) => {
         const normalizedSource = String(source || '').trim();
         if (!normalizedSource) {
@@ -387,6 +536,7 @@ export default function CanvasWorkspace() {
 
         const onSelected = () => {
             const active = canvas.getActiveObject();
+            assignTextEditingContainer(active ?? null);
             applyInteractiveHandleScale(visualScaleRef.current, active ?? null);
             if (active?._layerId) setSelectedLayerId(active._layerId);
             setSelectedObject(active ?? null);
@@ -401,20 +551,30 @@ export default function CanvasWorkspace() {
             syncLayersRef.current?.();
             pushHistoryRef.current?.();
         };
+        const onMouseDown = (event) => {
+            assignTextEditingContainer(event?.target ?? null);
+        };
+        const onTextEditingEntered = (event) => {
+            assignTextEditingContainer(event?.target ?? null);
+        };
 
         canvas.on('selection:created', onSelected);
         canvas.on('selection:updated', onSelected);
         canvas.on('selection:cleared', onCleared);
+        canvas.on('mouse:down', onMouseDown);
         canvas.on('object:modified', onModified);
         canvas.on('text:changed', onTextChanged);
+        canvas.on('text:editing:entered', onTextEditingEntered);
         canvas.on('text:editing:exited', onTextEditingExited);
         const onObjectAdded = (e) => {
+            assignTextEditingContainer(e?.target ?? null);
             applyInteractiveHandleScale(visualScaleRef.current, e?.target);
         };
         canvas.on('object:added', onObjectAdded);
 
         setCanvas(canvas);
         restoreCurrentSurface(canvas).then((restored) => {
+            assignTextEditingContainer();
             if (!restored) pushHistoryRef.current?.();
             queueAlign();
         });
@@ -423,8 +583,10 @@ export default function CanvasWorkspace() {
             canvas.off('selection:created', onSelected);
             canvas.off('selection:updated', onSelected);
             canvas.off('selection:cleared', onCleared);
+            canvas.off('mouse:down', onMouseDown);
             canvas.off('object:modified', onModified);
             canvas.off('text:changed', onTextChanged);
+            canvas.off('text:editing:entered', onTextEditingEntered);
             canvas.off('text:editing:exited', onTextEditingExited);
             canvas.off('object:added', onObjectAdded);
             canvas.dispose();
