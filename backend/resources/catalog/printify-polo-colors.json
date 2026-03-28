@@ -1,0 +1,110 @@
+[
+    {
+        "label": "White",
+        "rgb": "rgb(249,249,249)",
+        "hex": "#F9F9F9",
+        "imageUrl": ""
+    },
+    {
+        "label": "Iron Grey",
+        "rgb": "rgb(89,89,89)",
+        "hex": "#595959",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ac"
+    },
+    {
+        "label": "Grey Concrete",
+        "rgb": "rgb(131,136,129)",
+        "hex": "#838881",
+        "imageUrl": ""
+    },
+    {
+        "label": "Black",
+        "rgb": "rgb(0,0,0)",
+        "hex": "#000000",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ac"
+    },
+    {
+        "label": "True Red",
+        "rgb": "rgb(215,2,58)",
+        "hex": "#D7023A",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fec7ce46f30f8328200a"
+    },
+    {
+        "label": "Maroon",
+        "rgb": "rgb(91,44,51)",
+        "hex": "#5B2C33",
+        "imageUrl": ""
+    },
+    {
+        "label": "Texas Orange",
+        "rgb": "rgb(185,98,68)",
+        "hex": "#B96244",
+        "imageUrl": ""
+    },
+    {
+        "label": "Deep Orange",
+        "rgb": "rgb(206,74,25)",
+        "hex": "#CE4A19",
+        "imageUrl": ""
+    },
+    {
+        "label": "Gold",
+        "rgb": "rgb(245,169,0)",
+        "hex": "#F5A900",
+        "imageUrl": ""
+    },
+    {
+        "label": "Vegas Gold",
+        "rgb": "rgb(227,216,173)",
+        "hex": "#E3D8AD",
+        "imageUrl": ""
+    },
+    {
+        "label": "Lime Shock",
+        "rgb": "rgb(145,229,0)",
+        "hex": "#91E500",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fec7ce46f30f8328200a"
+    },
+    {
+        "label": "Forest Green",
+        "rgb": "rgb(49,70,58)",
+        "hex": "#31463A",
+        "imageUrl": ""
+    },
+    {
+        "label": "Kelly Green",
+        "rgb": "rgb(0,123,75)",
+        "hex": "#007B4B",
+        "imageUrl": ""
+    },
+    {
+        "label": "Tropic Blue",
+        "rgb": "rgb(11,123,147)",
+        "hex": "#0B7B93",
+        "imageUrl": ""
+    },
+    {
+        "label": "Blue Lake",
+        "rgb": "rgb(95,141,218)",
+        "hex": "#5F8DDA",
+        "imageUrl": ""
+    },
+    {
+        "label": "True Royal",
+        "rgb": "rgb(39,71,173)",
+        "hex": "#2747AD",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ac"
+    },
+    {
+        "label": "True Navy",
+        "rgb": "rgb(64,63,81)",
+        "hex": "#403F51",
+        "imageUrl": "https://images-merch.printify.com/api/file/5853fecdce46f30f832820ac"
+    },
+    {
+        "label": "Purple",
+        "rgb": "rgb(78,46,131)",
+        "hex": "#4E2E83",
+        "imageUrl": ""
+    }
+]

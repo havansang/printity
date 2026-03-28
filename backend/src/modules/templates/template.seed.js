@@ -1,5 +1,5 @@
 const Template = require('./template.model');
-const { PRINTIFY_AVAILABLE_COLORS } = require('./template-color.util');
+const { PRODUCT_AVAILABLE_COLORS } = require('./template-color.util');
 const { templateSeedSchema } = require('./template.validation');
 
 const defaultTemplates = [
@@ -16,7 +16,7 @@ const defaultTemplates = [
     },
     thumbnailUrl: '/mockups/basic-tshirt/thumbnail.svg',
     supportedSurfaces: ['front', 'back', 'neckLabelInner'],
-    availableColors: PRINTIFY_AVAILABLE_COLORS,
+    availableColors: PRODUCT_AVAILABLE_COLORS.tshirt,
     defaultRenderOptions: {
       size: 2048,
       format: 'jpeg',
@@ -184,7 +184,7 @@ const defaultTemplates = [
     },
     thumbnailUrl: '/mockups/basic-polo/thumbnail.svg',
     supportedSurfaces: ['front', 'back', 'neckLabelInner'],
-    availableColors: PRINTIFY_AVAILABLE_COLORS,
+    availableColors: PRODUCT_AVAILABLE_COLORS.polo,
     defaultRenderOptions: {
       size: 2048,
       format: 'jpeg',

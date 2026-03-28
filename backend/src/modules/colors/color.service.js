@@ -1,7 +1,16 @@
-const { buildAvailableColors } = require('../templates/template-color.util');
+const {
+  buildAllAvailableColors,
+  getAvailableColorsByProductType,
+  normalizeProductType,
+} = require('../templates/template-color.util');
 
-async function listColors() {
-  const items = buildAvailableColors();
+async function listColors({ productType } = {}) {
+  const normalizedProductType = String(productType || '').trim()
+    ? normalizeProductType(productType)
+    : '';
+  const items = normalizedProductType
+    ? getAvailableColorsByProductType(normalizedProductType)
+    : buildAllAvailableColors();
 
   return {
     items,

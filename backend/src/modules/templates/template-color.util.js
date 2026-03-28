@@ -1,27 +1,47 @@
 const fs = require('fs');
 const path = require('path');
+const { PRODUCT_TYPES } = require('../../constants/product');
 
-const PRINTIFY_COLORS_CANDIDATE_PATHS = [
-  path.resolve(__dirname, '../../../resources/catalog/printify-colors.json'),
-  path.resolve(__dirname, '../../../../uploads/printify-colors.json'),
-];
+const PRODUCT_COLOR_CANDIDATE_PATHS = {
+  tshirt: [
+    path.resolve(__dirname, '../../../resources/catalog/printify-colors.json'),
+    path.resolve(__dirname, '../../../../uploads/printify-colors.json'),
+  ],
+  polo: [
+    path.resolve(__dirname, '../../../resources/catalog/printify-polo-colors.json'),
+    path.resolve(__dirname, '../../../../uploads/printify-polo-colors.json'),
+  ],
+};
 
-function resolvePrintifyColorsPath() {
-  const matchedPath = PRINTIFY_COLORS_CANDIDATE_PATHS.find((candidatePath) => fs.existsSync(candidatePath));
+function normalizeProductType(productType) {
+  const normalizedValue = String(productType || '')
+    .trim()
+    .toLowerCase();
+
+  if (PRODUCT_TYPES.includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  return 'tshirt';
+}
+
+function resolvePrintifyColorsPath(productType = 'tshirt') {
+  const normalizedProductType = normalizeProductType(productType);
+  const candidatePaths = PRODUCT_COLOR_CANDIDATE_PATHS[normalizedProductType] || [];
+  const matchedPath = candidatePaths.find((candidatePath) => fs.existsSync(candidatePath));
 
   if (!matchedPath) {
     throw new Error(
-      `Printify colors file not found. Checked: ${PRINTIFY_COLORS_CANDIDATE_PATHS.join(', ')}`,
+      `Printify colors file not found for "${normalizedProductType}". Checked: ${candidatePaths.join(', ')}`,
     );
   }
 
   return matchedPath;
 }
 
-const PRINTIFY_COLORS_PATH = resolvePrintifyColorsPath();
-
-function readPrintifyColors() {
-  return JSON.parse(fs.readFileSync(PRINTIFY_COLORS_PATH, 'utf8').replace(/^\uFEFF/, ''));
+function readPrintifyColors(productType = 'tshirt') {
+  const colorsPath = resolvePrintifyColorsPath(productType);
+  return JSON.parse(fs.readFileSync(colorsPath, 'utf8').replace(/^\uFEFF/, ''));
 }
 
 function normalizeHex(hex) {
@@ -92,7 +112,8 @@ function mapPrintifyColor(color, index) {
   };
 }
 
-function buildAvailableColors(colors = readPrintifyColors()) {
+function buildAvailableColors(input = 'tshirt') {
+  const colors = Array.isArray(input) ? input : readPrintifyColors(input);
   const deduped = new Map();
 
   colors.forEach((color, index) => {
@@ -109,12 +130,34 @@ function buildAvailableColors(colors = readPrintifyColors()) {
   return Array.from(deduped.values());
 }
 
-const PRINTIFY_AVAILABLE_COLORS = buildAvailableColors();
+function getAvailableColorsByProductType(productType = 'tshirt') {
+  const normalizedProductType = normalizeProductType(productType);
+  return PRODUCT_AVAILABLE_COLORS[normalizedProductType] || [];
+}
+
+function buildAllAvailableColors() {
+  return buildAvailableColors(
+    PRODUCT_TYPES.flatMap((productType) => getAvailableColorsByProductType(productType))
+  );
+}
+
+const PRODUCT_AVAILABLE_COLORS = Object.freeze(
+  Object.fromEntries(
+    PRODUCT_TYPES.map((productType) => [productType, buildAvailableColors(productType)])
+  )
+);
+const PRINTIFY_AVAILABLE_COLORS = PRODUCT_AVAILABLE_COLORS.tshirt;
+const PRINTIFY_COLORS_PATH = resolvePrintifyColorsPath('tshirt');
 
 module.exports = {
+  PRODUCT_AVAILABLE_COLORS,
+  PRODUCT_COLOR_CANDIDATE_PATHS,
   PRINTIFY_AVAILABLE_COLORS,
   PRINTIFY_COLORS_PATH,
+  buildAllAvailableColors,
   buildAvailableColors,
+  getAvailableColorsByProductType,
+  normalizeProductType,
   readPrintifyColors,
   normalizeColorKey,
   normalizeHex,

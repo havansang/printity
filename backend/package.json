@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "seed:templates": "node scripts/seed-templates.js",
     "seed:shapes": "node scripts/seed-shapes.js",
-    "sync:fonts": "node scripts/sync-fonts.js"
+    "sync:fonts": "node scripts/sync-fonts.js",
+    "cleanup:basic-polo-colors": "node scripts/cleanup-empty-basic-polo-colors.js"
   },
   "keywords": [],
   "author": "",
