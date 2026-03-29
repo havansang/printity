@@ -171,18 +171,48 @@ function resolveAssetIdFromLookup(assetLookup, ...candidates) {
     return '';
 }
 
-function getLayerBasePayload(object, printArea, snapshotObject) {
-    const center = typeof object?.getCenterPoint === 'function'
-        ? object.getCenterPoint()
-        : {
-            x: (Number(object?.left) || 0) + ((Number(object?.width) || 0) * getAbsoluteScale(object?.scaleX)) / 2,
-            y: (Number(object?.top) || 0) + ((Number(object?.height) || 0) * getAbsoluteScale(object?.scaleY)) / 2,
-        };
+function getObjectCenterPoint(object) {
+    if (typeof object?.getCenterPoint === 'function') {
+        return object.getCenterPoint();
+    }
+
+    return {
+        x: (Number(object?.left) || 0) + ((Number(object?.width) || 0) * getAbsoluteScale(object?.scaleX)) / 2,
+        y: (Number(object?.top) || 0) + ((Number(object?.height) || 0) * getAbsoluteScale(object?.scaleY)) / 2,
+    };
+}
+
+function resolveSnapshotCoordinateOrigin(objects, printArea) {
+    if (!Array.isArray(objects) || objects.length === 0) {
+        return 'scene';
+    }
+
+    const printAreaX = Number(printArea?.x) || 0;
+    const printAreaY = Number(printArea?.y) || 0;
+    const slackX = Math.max(24, Math.min(200, (Number(printArea?.width) || 0) * 0.08));
+    const slackY = Math.max(24, Math.min(240, (Number(printArea?.height) || 0) * 0.08));
+
+    let localEvidence = 0;
+
+    objects.forEach((object) => {
+        const center = getObjectCenterPoint(object);
+        if ((Number(center?.x) || 0) < printAreaX - slackX || (Number(center?.y) || 0) < printAreaY - slackY) {
+            localEvidence += 1;
+        }
+    });
+
+    return localEvidence >= Math.ceil(objects.length / 2) ? 'local' : 'scene';
+}
+
+function getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin = 'scene') {
+    const center = getObjectCenterPoint(object);
+    const printAreaX = coordinateOrigin === 'local' ? 0 : Number(printArea?.x) || 0;
+    const printAreaY = coordinateOrigin === 'local' ? 0 : Number(printArea?.y) || 0;
 
     return {
         id: resolveObjectCustomProp(object, snapshotObject, '_layerId', 'layerId'),
-        x: roundFloat((center.x - (Number(printArea?.x) || 0)) / Math.max(1, Number(printArea?.width) || 1)),
-        y: roundFloat((center.y - (Number(printArea?.y) || 0)) / Math.max(1, Number(printArea?.height) || 1)),
+        x: roundFloat((center.x - printAreaX) / Math.max(1, Number(printArea?.width) || 1)),
+        y: roundFloat((center.y - printAreaY) / Math.max(1, Number(printArea?.height) || 1)),
         angle: roundFloat(object?.angle || 0, 3),
         scale: 1,
         flipX: Boolean(object?.flipX),
@@ -300,9 +330,9 @@ function scalePathCommands(pathCommands, sourceWidth, sourceHeight, targetWidth,
     return util.joinPath(transformedPath, 3);
 }
 
-function serializeShapeObject(object, printArea, objectIndex, snapshotObject) {
+function serializeShapeObject(object, printArea, objectIndex, snapshotObject, coordinateOrigin) {
     const dimensions = getScaledDimensions(object);
-    const base = getLayerBasePayload(object, printArea, snapshotObject);
+    const base = getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin);
     const scaleX = getAbsoluteScale(object?.scaleX);
     const scaleY = getAbsoluteScale(object?.scaleY);
     const rawType = String(object?.type || '').toLowerCase();
@@ -350,9 +380,9 @@ function serializeShapeObject(object, printArea, objectIndex, snapshotObject) {
     };
 }
 
-function serializeTextObject(object, printArea, objectIndex, snapshotObject) {
+function serializeTextObject(object, printArea, objectIndex, snapshotObject, coordinateOrigin) {
     const dimensions = getScaledDimensions(object);
-    const base = getLayerBasePayload(object, printArea, snapshotObject);
+    const base = getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin);
     const scaleY = getAbsoluteScale(object?.scaleY);
     const fontSize = Math.max(1, (Number(object?.fontSize) || 16) * scaleY);
     const lineHeight = Math.max(1, fontSize * (Number(object?.lineHeight) || 1.16));
@@ -375,7 +405,7 @@ function serializeTextObject(object, printArea, objectIndex, snapshotObject) {
     };
 }
 
-async function serializeImageObject(object, printArea, objectIndex, snapshotObject, assetLookup) {
+async function serializeImageObject(object, printArea, objectIndex, snapshotObject, assetLookup, coordinateOrigin) {
     const assetId = String(
         resolveObjectCustomProp(object, snapshotObject, '_assetId', 'assetId')
         || resolveAssetIdFromLookup(
@@ -395,7 +425,7 @@ async function serializeImageObject(object, printArea, objectIndex, snapshotObje
     }
 
     const dimensions = getScaledDimensions(object);
-    const base = getLayerBasePayload(object, printArea, snapshotObject);
+    const base = getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin);
     const imageName = resolveObjectCustomProp(object, snapshotObject, '_imageName', 'name') || 'Image';
 
     return {
@@ -411,16 +441,16 @@ async function serializeImageObject(object, printArea, objectIndex, snapshotObje
     };
 }
 
-async function serializeCanvasObject(object, printArea, objectIndex, snapshotObject, assetLookup) {
+async function serializeCanvasObject(object, printArea, objectIndex, snapshotObject, assetLookup, coordinateOrigin) {
     if (object instanceof IText || String(object?.type || '').toLowerCase() === 'i-text') {
-        return serializeTextObject(object, printArea, objectIndex, snapshotObject);
+        return serializeTextObject(object, printArea, objectIndex, snapshotObject, coordinateOrigin);
     }
 
     if (object instanceof FabricImage || String(object?.type || '').toLowerCase() === 'image') {
-        return serializeImageObject(object, printArea, objectIndex, snapshotObject, assetLookup);
+        return serializeImageObject(object, printArea, objectIndex, snapshotObject, assetLookup, coordinateOrigin);
     }
 
-    return serializeShapeObject(object, printArea, objectIndex, snapshotObject);
+    return serializeShapeObject(object, printArea, objectIndex, snapshotObject, coordinateOrigin);
 }
 
 async function serializeSurfaceLayers(snapshot, surfaceDef, printArea, uploadedImages) {
@@ -455,6 +485,7 @@ async function serializeSurfaceLayers(snapshot, surfaceDef, printArea, uploadedI
 
         const layers = [];
         const canvasObjects = canvas.getObjects();
+        const coordinateOrigin = resolveSnapshotCoordinateOrigin(canvasObjects, printArea);
 
         for (let index = 0; index < canvasObjects.length; index += 1) {
             const layer = await serializeCanvasObject(
@@ -462,7 +493,8 @@ async function serializeSurfaceLayers(snapshot, surfaceDef, printArea, uploadedI
                 printArea,
                 index,
                 objects[index] || null,
-                assetLookup
+                assetLookup,
+                coordinateOrigin
             );
             if (layer) {
                 layers.push(layer);
