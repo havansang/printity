@@ -11,7 +11,7 @@ import {
 } from 'fabric';
 
 const BACKEND_TEMPLATE_ID_PATTERN = /^[a-f\d]{24}$/i;
-const DEFAULT_OUTPUT_SIZE = 2400;
+const DEFAULT_OUTPUT_SIZE = 2048;
 const MAX_OUTPUT_SIZE = 4096;
 const DEFAULT_OUTPUT_FORMAT = 'png';
 const SUPPORTED_FORMATS = new Set(['png', 'jpeg', 'jpg', 'webp']);
@@ -360,8 +360,6 @@ function serializeShapeObject(object, printArea, objectIndex, snapshotObject, co
     const scaleX = getAbsoluteScale(object?.scaleX);
     const scaleY = getAbsoluteScale(object?.scaleY);
     const rawType = String(object?.type || '').toLowerCase();
-    const shapeId = resolveObjectCustomProp(object, snapshotObject, '_shapeId', 'shapeId') || undefined;
-    const shapeSlug = resolveObjectCustomProp(object, snapshotObject, '_shapeSlug', 'shapeSlug') || undefined;
     let pathCommands = '';
 
     if (object instanceof Path || rawType === 'path') {
@@ -407,8 +405,6 @@ function serializeShapeObject(object, printArea, objectIndex, snapshotObject, co
         ...base,
         id: base.id || `shape-${objectIndex + 1}`,
         layerType: 'shape',
-        shapeId,
-        shapeSlug,
         width: dimensions.width,
         height: dimensions.height,
         fill: {
@@ -416,7 +412,7 @@ function serializeShapeObject(object, printArea, objectIndex, snapshotObject, co
             color: String(object?.fill || '#000000'),
         },
         stroke: serializeShapeStroke(object),
-        ...(shapeId ? {} : { pathCommands }),
+        pathCommands,
     };
 }
 
@@ -553,6 +549,52 @@ async function serializeSurfaceLayers(snapshot, surfaceDef, printArea, uploadedI
     }
 }
 
+async function serializeSurfaceLayersFromCanvas(canvas, printArea, uploadedImages) {
+    if (!canvas || canvas.disposed || canvas.destroyed) {
+        return [];
+    }
+
+    const canvasObjects = typeof canvas.getObjects === 'function' ? canvas.getObjects() : [];
+    if (!Array.isArray(canvasObjects) || canvasObjects.length === 0) {
+        return [];
+    }
+
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+        try {
+            await document.fonts.ready;
+        } catch {
+            // Keep rendering with the font faces currently available in the browser.
+        }
+    }
+
+    if (typeof canvas.requestRenderAll === 'function') {
+        canvas.requestRenderAll();
+    }
+
+    const assetLookup = createAssetLookup(uploadedImages);
+    const coordinateOrigin = resolveSnapshotCoordinateOrigin(canvasObjects, printArea);
+    const layers = [];
+
+    for (let index = 0; index < canvasObjects.length; index += 1) {
+        const object = canvasObjects[index];
+        const objectCoordinateOrigin = resolveObjectCoordinateOrigin(object, null, coordinateOrigin);
+        const layer = await serializeCanvasObject(
+            object,
+            printArea,
+            index,
+            null,
+            assetLookup,
+            objectCoordinateOrigin
+        );
+
+        if (layer) {
+            layers.push(layer);
+        }
+    }
+
+    return layers;
+}
+
 export function canUseMockupPreviewApi(templateDef) {
     return BACKEND_TEMPLATE_ID_PATTERN.test(String(templateDef?.id || '').trim());
 }
@@ -562,6 +604,7 @@ export async function buildMockupPreviewPayload({
     surfaceDef,
     surfacePrintAreas,
     snapshots,
+    liveCanvas,
     shirtColor,
     shirtColors,
     uploadedImages,
@@ -577,12 +620,14 @@ export async function buildMockupPreviewPayload({
         return null;
     }
 
-    const images = await serializeSurfaceLayers(
-        snapshots?.[surfaceKey] || null,
-        surfaceDef,
-        printArea,
-        uploadedImages
-    );
+    const images = liveCanvas
+        ? await serializeSurfaceLayersFromCanvas(liveCanvas, printArea, uploadedImages)
+        : await serializeSurfaceLayers(
+            snapshots?.[surfaceKey] || null,
+            surfaceDef,
+            printArea,
+            uploadedImages
+        );
 
     const payload = {
         templateId,
@@ -590,7 +635,7 @@ export async function buildMockupPreviewPayload({
         surfaceKey,
         responseType: 'json',
         format: DEFAULT_OUTPUT_FORMAT,
-        size: DEFAULT_OUTPUT_SIZE,
+        size: clampOutputSize(templateDef?.defaultRenderOptions?.size || DEFAULT_OUTPUT_SIZE),
         print: {
             placeholders: [{
                 dom_id: resolveSurfaceDomIds(surfaceKey, surfaceDef),

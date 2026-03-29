@@ -1,7 +1,7 @@
 import {
     createContext, useContext, useCallback, useRef, useState, useEffect, useMemo,
 } from 'react';
-import { IText, FabricImage, Path } from 'fabric';
+import { IText, FabricImage, Path, Point } from 'fabric';
 import { navigate } from '../../app/router';
 import { useAuth } from '../../features/auth/AuthContext';
 import { createProject, updateProject } from '../../features/home/homeApi';
@@ -1029,6 +1029,20 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
     const zoomIn = useCallback(() => applyZoom(zoomLevel * SCENE_ZOOM_STEP), [applyZoom, zoomLevel]);
     const zoomOut = useCallback(() => applyZoom(zoomLevel / SCENE_ZOOM_STEP), [applyZoom, zoomLevel]);
 
+    const centerObjectInPrintArea = useCallback((obj, printArea) => {
+        if (!obj || !printArea) return;
+
+        obj.setPositionByOrigin(
+            new Point(
+                (Number(printArea.x) || 0) + (Number(printArea.width) || 0) / 2,
+                (Number(printArea.y) || 0) + (Number(printArea.height) || 0) / 2
+            ),
+            'center',
+            'center'
+        );
+        obj.setCoords();
+    }, []);
+
     /* ── alignment (relative to printArea) ──────────────────────── */
     const alignObject = useCallback((alignment) => {
         const canvas = canvasRef.current;
@@ -1102,7 +1116,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         text.coordinateOrigin = 'scene';
         refreshTextObjectLayout(text);
         canvas.add(text);
-        text.setCoords();
+        centerObjectInPrintArea(text, pa);
         canvas.setActiveObject(text);
         canvas.requestRenderAll();
         syncLayers();
@@ -1126,7 +1140,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         } else {
             setTimeout(startEditingText, 0);
         }
-    }, [loadFontFamily, refreshTextObjectLayout, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
+    }, [centerObjectInPrintArea, loadFontFamily, refreshTextObjectLayout, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const _placeImageOnCanvas = useCallback((imageSource, name, metadata = {}) => {
         const canvas = canvasRef.current;
@@ -1170,14 +1184,14 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
                 fabricImg.scaleY = nextScale;
             }
             canvas.add(fabricImg);
-            fabricImg.setCoords();
+            centerObjectInPrintArea(fabricImg, pa);
             canvas.setActiveObject(fabricImg);
             canvas.requestRenderAll();
             syncLayers();
             pushHistory();
         };
         imgEl.src = imageSource;
-    }, [syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
+    }, [centerObjectInPrintArea, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const addImage = useCallback(async (file) => {
         const canvas = canvasRef.current;
@@ -1331,12 +1345,12 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         shape._coordinateOrigin = 'scene';
         shape.coordinateOrigin = 'scene';
         canvas.add(shape);
-        shape.setCoords();
+        centerObjectInPrintArea(shape, pa);
         canvas.setActiveObject(shape);
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
-    }, [availableShapes, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
+    }, [availableShapes, centerObjectInPrintArea, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     /* ── delete / duplicate ──────────────────────────────────────── */
 

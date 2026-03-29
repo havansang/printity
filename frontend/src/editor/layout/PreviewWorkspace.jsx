@@ -186,6 +186,8 @@ function getOrderedSurfaceDefs(surfaceDefs) {
 
 export default function PreviewWorkspace() {
     const {
+        canvasRef,
+        activeSurface,
         shirtColor,
         shirtColors,
         surfaceDefs,
@@ -242,6 +244,7 @@ export default function PreviewWorkspace() {
             surfaceDef,
             surfacePrintAreas,
             snapshots,
+            liveCanvas: surfaceKey === activeSurface ? canvasRef.current : null,
             shirtColor,
             shirtColors,
             uploadedImages,
@@ -284,6 +287,8 @@ export default function PreviewWorkspace() {
         }
     }, [
         orderedSurfaceDefs,
+        activeSurface,
+        canvasRef,
         shirtColor,
         shirtColors,
         surfaceDefs,

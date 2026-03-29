@@ -366,14 +366,8 @@ export default function CanvasWorkspace() {
 
         const vpt = canvas.viewportTransform?.slice() || [1, 0, 0, 1, 0, 0];
         const zoom = Number(vpt[0]) || 1;
-
-        const prevBaseTx = -basePrintAreaRef.current.x * zoom;
-        const prevBaseTy = -basePrintAreaRef.current.y * zoom;
-        const panX = vpt[4] - prevBaseTx;
-        const panY = vpt[5] - prevBaseTy;
-
-        vpt[4] = -(pa.x || 0) * zoom + panX;
-        vpt[5] = -(pa.y || 0) * zoom + panY;
+        vpt[4] = -(pa.x || 0) * zoom;
+        vpt[5] = -(pa.y || 0) * zoom;
         canvas.setViewportTransform(vpt);
 
         basePrintAreaRef.current = { x: pa.x || 0, y: pa.y || 0 };
