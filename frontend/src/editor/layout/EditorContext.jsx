@@ -31,6 +31,8 @@ const CUSTOM_PROPS = [
     '_layerId',
     '_imageName',
     'imageName',
+    '_coordinateOrigin',
+    'coordinateOrigin',
     '_shapeType',
     '_layerType',
     'layerType',
@@ -1085,8 +1087,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             fontStyle: nextFontStyle,
         });
         const text = new IText('Your text here', {
-            left: pa.x,
-            top: pa.y,
+            left: pa.x + pa.width / 2,
+            top: pa.y + pa.height / 2,
             originX: 'center',
             originY: 'center',
             fontSize: Math.round(32 * unitScale),
@@ -1096,9 +1098,10 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             fill: '#222222',
         });
         text._layerType = 'text';
+        text._coordinateOrigin = 'scene';
+        text.coordinateOrigin = 'scene';
         refreshTextObjectLayout(text);
         canvas.add(text);
-        canvas.viewportCenterObject(text);
         text.setCoords();
         canvas.setActiveObject(text);
         canvas.requestRenderAll();
@@ -1136,15 +1139,17 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             const pa = _getPrintArea();
             const unitScale = _getObjectUnitScale();
             const fabricImg = new FabricImage(imgEl, {
-                originX: 'left',
-                originY: 'top',
-                left: pa.x + 20 * unitScale,
-                top: pa.y + 20 * unitScale,
+                originX: 'center',
+                originY: 'center',
+                left: pa.x + pa.width / 2,
+                top: pa.y + pa.height / 2,
             });
             fabricImg._imageName = name;
             fabricImg.imageName = name;
             fabricImg._layerType = 'image';
             fabricImg.layerType = 'image';
+            fabricImg._coordinateOrigin = 'scene';
+            fabricImg.coordinateOrigin = 'scene';
             fabricImg._assetId = metadata.assetId || '';
             fabricImg.assetId = metadata.assetId || '';
             fabricImg._assetUrl = metadata.assetUrl || '';
@@ -1165,8 +1170,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
                 fabricImg.scaleY = nextScale;
             }
             canvas.add(fabricImg);
+            fabricImg.setCoords();
             canvas.setActiveObject(fabricImg);
-            canvas.viewportCenterObject(fabricImg)
             canvas.requestRenderAll();
             syncLayers();
             pushHistory();
@@ -1291,8 +1296,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         const pa = _getPrintArea();
         const unitScale = _getObjectUnitScale();
         const baseOpts = {
-            left: pa.x,
-            top: pa.y,
+            left: pa.x + pa.width / 2,
+            top: pa.y + pa.height / 2,
             fill: DEFAULT_SHAPE_COLOR_HEX,
             stroke: null,
             strokeWidth: 0,
@@ -1323,8 +1328,9 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         shape._shapeSourceHeight = sourceHeight;
         shape.shapeSourceHeight = sourceHeight;
         shape._layerType = 'shape';
+        shape._coordinateOrigin = 'scene';
+        shape.coordinateOrigin = 'scene';
         canvas.add(shape);
-        canvas.viewportCenterObject(shape);
         shape.setCoords();
         canvas.setActiveObject(shape);
         canvas.requestRenderAll();

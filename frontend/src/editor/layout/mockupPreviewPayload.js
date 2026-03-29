@@ -204,6 +204,18 @@ function resolveSnapshotCoordinateOrigin(objects, printArea) {
     return localEvidence >= Math.ceil(objects.length / 2) ? 'local' : 'scene';
 }
 
+function resolveObjectCoordinateOrigin(object, snapshotObject, fallbackOrigin = 'scene') {
+    const explicitOrigin = String(
+        resolveObjectCustomProp(object, snapshotObject, '_coordinateOrigin', 'coordinateOrigin') || ''
+    ).trim().toLowerCase();
+
+    if (explicitOrigin === 'local' || explicitOrigin === 'scene') {
+        return explicitOrigin;
+    }
+
+    return fallbackOrigin;
+}
+
 function getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin = 'scene') {
     const center = getObjectCenterPoint(object);
     const printAreaX = coordinateOrigin === 'local' ? 0 : Number(printArea?.x) || 0;
@@ -516,13 +528,19 @@ async function serializeSurfaceLayers(snapshot, surfaceDef, printArea, uploadedI
         const coordinateOrigin = resolveSnapshotCoordinateOrigin(canvasObjects, printArea);
 
         for (let index = 0; index < canvasObjects.length; index += 1) {
+            const snapshotObject = objects[index] || null;
+            const objectCoordinateOrigin = resolveObjectCoordinateOrigin(
+                canvasObjects[index],
+                snapshotObject,
+                coordinateOrigin
+            );
             const layer = await serializeCanvasObject(
                 canvasObjects[index],
                 printArea,
                 index,
-                objects[index] || null,
+                snapshotObject,
                 assetLookup,
-                coordinateOrigin
+                objectCoordinateOrigin
             );
             if (layer) {
                 layers.push(layer);
