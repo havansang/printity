@@ -89,6 +89,25 @@ function normalizePrintArea(area) {
     };
 }
 
+function normalizeOptionalPrintArea(area) {
+    if (!area || typeof area !== 'object') {
+        return null;
+    }
+
+    const width = Number(area.width);
+    const height = Number(area.height);
+    if (width <= 0 || height <= 0) {
+        return null;
+    }
+
+    return {
+        x: Number(area.x) || 0,
+        y: Number(area.y) || 0,
+        width,
+        height,
+    };
+}
+
 function snapshotHasObjects(snapshot) {
     return Array.isArray(snapshot?.objects) && snapshot.objects.length > 0;
 }
@@ -114,9 +133,16 @@ function getInitialProjectSurfaceSnapshots(initialProject, surfaceKeys) {
     );
 }
 
-function getInitialProjectPrintAreas(initialProject, surfaceKeys) {
+function getInitialProjectPrintAreas(initialProject, surfaceDefs) {
+    const surfacePrintAreaByKey = Object.fromEntries(
+        (surfaceDefs || []).map((surfaceDef) => [surfaceDef.key, surfaceDef?.printArea || null])
+    );
+    const surfaceKeys = (surfaceDefs || []).map((surfaceDef) => surfaceDef.key);
+
     return createSurfaceMap(surfaceKeys, (surfaceKey) => (
-        normalizePrintArea(initialProject?.printPayloadRaw?.printAreas?.[surfaceKey])
+        normalizeOptionalPrintArea(surfacePrintAreaByKey[surfaceKey])
+        || normalizeOptionalPrintArea(initialProject?.printPayloadRaw?.printAreas?.[surfaceKey])
+        || cloneSerializable(DEFAULT_PRINT_AREA)
     ));
 }
 
@@ -234,7 +260,7 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         initialProject?.selection?.colorHex || initialProject?.printPayloadRaw?.shirtColor
     ) || DEFAULT_SHIRT_COLOR_HEX;
     const initialSurfaceSnapshots = getInitialProjectSurfaceSnapshots(initialProject, surfaceKeys);
-    const initialSurfacePrintAreas = getInitialProjectPrintAreas(initialProject, surfaceKeys);
+    const initialSurfacePrintAreas = getInitialProjectPrintAreas(initialProject, surfaceDefs);
 
     /* ---------- multi-surface ---------------------------------------- */
     const [activeSurface, setActiveSurface] = useState(initialSurface);
@@ -1034,8 +1060,6 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         if (!canvas) return;
         const pa = _getPrintArea();
         const unitScale = _getObjectUnitScale();
-        const baseOffset = 20 * unitScale;
-        const randomOffset = 60 * unitScale;
         const requestedFamily = typeof fontInput === 'string' ? fontInput : fontInput?.family;
         const nextFontFamily = normalizeFontFamily(requestedFamily);
         const requestedFontWeight = typeof fontInput === 'object' ? fontInput?.fontWeight : 400;
@@ -1061,8 +1085,10 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             fontStyle: nextFontStyle,
         });
         const text = new IText('Your text here', {
-            left: pa.x + baseOffset + Math.random() * randomOffset,
-            top: pa.y + baseOffset + Math.random() * randomOffset,
+            left: pa.x,
+            top: pa.y,
+            originX: 'center',
+            originY: 'center',
             fontSize: Math.round(32 * unitScale),
             fontFamily: nextFontFamily,
             fontWeight: nextFontWeight,
@@ -1072,6 +1098,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         text._layerType = 'text';
         refreshTextObjectLayout(text);
         canvas.add(text);
+        canvas.viewportCenterObject(text);
+        text.setCoords();
         canvas.setActiveObject(text);
         canvas.requestRenderAll();
         syncLayers();
@@ -1263,13 +1291,13 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         const pa = _getPrintArea();
         const unitScale = _getObjectUnitScale();
         const baseOpts = {
-            left: pa.x + 40 * unitScale + Math.random() * 80 * unitScale,
-            top: pa.y + 40 * unitScale + Math.random() * 80 * unitScale,
+            left: pa.x,
+            top: pa.y,
             fill: DEFAULT_SHAPE_COLOR_HEX,
             stroke: null,
             strokeWidth: 0,
-            originX: 'left',
-            originY: 'top',
+            originX: 'center',
+            originY: 'center',
         };
 
         const shape = new Path(shapeRecord.geometry.pathCommands, baseOpts);
@@ -1296,6 +1324,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         shape.shapeSourceHeight = sourceHeight;
         shape._layerType = 'shape';
         canvas.add(shape);
+        canvas.viewportCenterObject(shape);
+        shape.setCoords();
         canvas.setActiveObject(shape);
         canvas.requestRenderAll();
         syncLayers();
