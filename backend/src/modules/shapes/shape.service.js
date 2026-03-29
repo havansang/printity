@@ -73,7 +73,23 @@ async function getShapeBySlug(slug, { activeOnly = true } = {}) {
   return mapShape(shape);
 }
 
+async function getShapeById(id, { activeOnly = true } = {}) {
+  const normalizedId = String(id || '').trim();
+  if (!normalizedId) {
+    throw new ApiError(404, 'Shape not found');
+  }
+
+  const shape = await Shape.findById(normalizedId).lean();
+
+  if (!shape || (activeOnly && shape.isActive === false)) {
+    throw new ApiError(404, 'Shape not found');
+  }
+
+  return mapShape(shape);
+}
+
 module.exports = {
+  getShapeById,
   getShapeBySlug,
   listShapes,
   mapShape,

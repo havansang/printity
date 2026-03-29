@@ -42,6 +42,8 @@ const CUSTOM_PROPS = [
     'sourceMimeType',
     '_shapeSlug',
     'shapeSlug',
+    '_shapeId',
+    'shapeId',
     '_shapePathCommands',
     'shapePathCommands',
     '_shapeSourceWidth',
@@ -1074,6 +1076,25 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         canvas.requestRenderAll();
         syncLayers();
         pushHistory();
+
+        const startEditingText = () => {
+            if (!canvasRef.current || canvasRef.current !== canvas || canvas.disposed || canvas.destroyed) {
+                return;
+            }
+
+            canvas.setActiveObject(text);
+            text.enterEditing();
+            text.selectAll();
+            text.hiddenTextarea?.focus?.();
+            text.hiddenTextarea?.select?.();
+            canvas.requestRenderAll();
+        };
+
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(startEditingText);
+        } else {
+            setTimeout(startEditingText, 0);
+        }
     }, [loadFontFamily, refreshTextObjectLayout, syncLayers, pushHistory, _getPrintArea, _getObjectUnitScale]);
 
     const _placeImageOnCanvas = useCallback((imageSource, name, metadata = {}) => {
@@ -1263,6 +1284,8 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
             scaleY: nextScale,
         });
         shape._shapeType = shapeRecord.name;
+        shape._shapeId = shapeRecord.id;
+        shape.shapeId = shapeRecord.id;
         shape._shapeSlug = shapeRecord.slug;
         shape.shapeSlug = shapeRecord.slug;
         shape._shapePathCommands = shapeRecord.geometry.pathCommands;
@@ -1305,6 +1328,10 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
         clone.set({ left: active.left + 20, top: active.top + 20 });
         clone._layerId = _nextId++;
         if (active._shapeType) clone._shapeType = active._shapeType;
+        if (active._shapeId || active.shapeId) {
+            clone._shapeId = active._shapeId || active.shapeId;
+            clone.shapeId = active.shapeId || active._shapeId;
+        }
         if (active._shapeSlug || active.shapeSlug) {
             clone._shapeSlug = active._shapeSlug || active.shapeSlug;
             clone.shapeSlug = active.shapeSlug || active._shapeSlug;

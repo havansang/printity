@@ -330,19 +330,45 @@ function scalePathCommands(pathCommands, sourceWidth, sourceHeight, targetWidth,
     return util.joinPath(transformedPath, 3);
 }
 
+function getPathCommandsFromObject(object) {
+    if (!Array.isArray(object?.path) || object.path.length === 0) {
+        return '';
+    }
+
+    try {
+        return util.joinPath(object.path, 3);
+    } catch {
+        return '';
+    }
+}
+
 function serializeShapeObject(object, printArea, objectIndex, snapshotObject, coordinateOrigin) {
     const dimensions = getScaledDimensions(object);
     const base = getLayerBasePayload(object, printArea, snapshotObject, coordinateOrigin);
     const scaleX = getAbsoluteScale(object?.scaleX);
     const scaleY = getAbsoluteScale(object?.scaleY);
     const rawType = String(object?.type || '').toLowerCase();
+    const shapeId = resolveObjectCustomProp(object, snapshotObject, '_shapeId', 'shapeId') || undefined;
+    const shapeSlug = resolveObjectCustomProp(object, snapshotObject, '_shapeSlug', 'shapeSlug') || undefined;
     let pathCommands = '';
 
     if (object instanceof Path || rawType === 'path') {
+        const sourcePathCommands =
+            resolveObjectCustomProp(object, snapshotObject, '_shapePathCommands', 'shapePathCommands')
+            || getPathCommandsFromObject(object);
+        const sourceWidth =
+            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceWidth', 'shapeSourceWidth')
+            || Number(object?.width)
+            || dimensions.width;
+        const sourceHeight =
+            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceHeight', 'shapeSourceHeight')
+            || Number(object?.height)
+            || dimensions.height;
+
         pathCommands = scalePathCommands(
-            resolveObjectCustomProp(object, snapshotObject, '_shapePathCommands', 'shapePathCommands'),
-            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceWidth', 'shapeSourceWidth'),
-            resolveObjectCustomProp(object, snapshotObject, '_shapeSourceHeight', 'shapeSourceHeight'),
+            sourcePathCommands,
+            sourceWidth,
+            sourceHeight,
             dimensions.width,
             dimensions.height,
         );
@@ -369,14 +395,16 @@ function serializeShapeObject(object, printArea, objectIndex, snapshotObject, co
         ...base,
         id: base.id || `shape-${objectIndex + 1}`,
         layerType: 'shape',
+        shapeId,
+        shapeSlug,
         width: dimensions.width,
         height: dimensions.height,
-        pathCommands,
         fill: {
             type: 'solid',
             color: String(object?.fill || '#000000'),
         },
         stroke: serializeShapeStroke(object),
+        ...(shapeId ? {} : { pathCommands }),
     };
 }
 

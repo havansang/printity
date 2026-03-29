@@ -6,6 +6,8 @@ const layerSchema = z
   .object({
     id: z.union([z.string(), z.number()]).optional(),
     assetId: objectIdSchema.optional(),
+    shapeId: objectIdSchema.optional(),
+    shapeSlug: z.string().trim().min(1).optional(),
     x: z.number().optional(),
     y: z.number().optional(),
     angle: z.number().optional(),

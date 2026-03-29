@@ -8,6 +8,7 @@ const { SURFACE_KEYS } = require('../../constants/product');
 const { getUploadRootAbsolutePath } = require('../../utils/file');
 const Asset = require('../assets/asset.model');
 const { getTextToSvg } = require('../fonts/font.service');
+const shapeService = require('../shapes/shape.service');
 const { normalizeColorKey, normalizeHex } = require('../templates/template-color.util');
 const { getActiveTemplateById } = require('../templates/template.service');
 
@@ -15,6 +16,7 @@ const MOCKUP_ROOT = path.resolve(process.cwd(), 'resources', 'mockups');
 const LOCAL_ASSET_CACHE = new Map();
 const LOCAL_MANIFEST_CACHE = new Map();
 const ASSET_RECORD_CACHE = new Map();
+const SHAPE_RECORD_CACHE = new Map();
 const FORMAT_ALIASES = {
   jpg: 'jpeg',
 };
@@ -548,6 +550,93 @@ async function resolveLayerAssetSource(layer) {
   };
 }
 
+async function getShapeRecord(layer) {
+  const normalizedShapeId = String(layer?.shapeId || '').trim();
+  const normalizedShapeSlug = String(layer?.shapeSlug || '').trim().toLowerCase();
+  const cacheKeys = [];
+
+  if (normalizedShapeId) {
+    cacheKeys.push(`id:${normalizedShapeId}`);
+  }
+
+  if (normalizedShapeSlug) {
+    cacheKeys.push(`slug:${normalizedShapeSlug}`);
+  }
+
+  for (const cacheKey of cacheKeys) {
+    if (SHAPE_RECORD_CACHE.has(cacheKey)) {
+      return SHAPE_RECORD_CACHE.get(cacheKey);
+    }
+  }
+
+  let shape = null;
+  let lookupError = null;
+
+  try {
+    if (normalizedShapeId) {
+      shape = await shapeService.getShapeById(normalizedShapeId, { activeOnly: false });
+    } else if (normalizedShapeSlug) {
+      shape = await shapeService.getShapeBySlug(normalizedShapeSlug, { activeOnly: false });
+    }
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.statusCode !== 404) {
+      throw error;
+    }
+
+    lookupError = error;
+  }
+
+  if (shape) {
+    const shapeIdCacheKey = shape.id ? `id:${shape.id}` : null;
+    const shapeSlugCacheKey = shape.slug ? `slug:${shape.slug}` : null;
+
+    [shapeIdCacheKey, shapeSlugCacheKey, ...cacheKeys]
+      .filter(Boolean)
+      .forEach((cacheKey) => {
+        SHAPE_RECORD_CACHE.set(cacheKey, shape);
+      });
+  }
+
+  return {
+    shape,
+    lookupError,
+  };
+}
+
+async function resolveShapeLayer(layer) {
+  const normalizedShapeId = String(layer?.shapeId || '').trim();
+  const normalizedShapeSlug = String(layer?.shapeSlug || '').trim().toLowerCase();
+  const { shape, lookupError } = await getShapeRecord(layer);
+  const pathCommands = String(shape?.geometry?.pathCommands || layer?.pathCommands || '').trim();
+
+  if (!pathCommands) {
+    if (lookupError && (normalizedShapeId || normalizedShapeSlug)) {
+      throw new ApiError(422, `Shape layer could not be resolved from shapeId/shapeSlug: ${normalizedShapeId || normalizedShapeSlug}`);
+    }
+
+    throw new ApiError(422, 'Shape layer is missing geometry');
+  }
+
+  const width =
+    Number.isFinite(Number(layer?.width)) && Number(layer.width) > 0
+      ? Number(layer.width)
+      : Number(shape?.geometry?.defaultWidth) || 100;
+  const height =
+    Number.isFinite(Number(layer?.height)) && Number(layer.height) > 0
+      ? Number(layer.height)
+      : Number(shape?.geometry?.defaultHeight) || 100;
+
+  return {
+    ...layer,
+    shapeId: String(layer?.shapeId || shape?.id || '').trim() || undefined,
+    shapeSlug: String(layer?.shapeSlug || shape?.slug || '').trim().toLowerCase() || undefined,
+    pathCommands,
+    width,
+    height,
+    name: layer?.name || shape?.name || layer?.shapeSlug || 'Shape',
+  };
+}
+
 async function getAssetMetadata(assetUrl) {
   if (!assetUrl) {
     return null;
@@ -915,25 +1004,35 @@ async function buildImageLayerMarkup(layer, baseWidth, baseHeight) {
 
 async function buildLayerMarkup(layer, placeholderWidth, placeholderHeight) {
   const layerType = String(layer?.layerType || '').trim().toLowerCase();
-  const x = Number.isFinite(Number(layer?.x)) ? Number(layer.x) : 0.5;
-  const y = Number.isFinite(Number(layer?.y)) ? Number(layer.y) : 0.5;
-  const angle = Number.isFinite(Number(layer?.angle)) ? Number(layer.angle) : 0;
-  const scale = Number.isFinite(Number(layer?.scale)) && Number(layer.scale) > 0 ? Number(layer.scale) : 1;
-  const baseWidth = Number.isFinite(Number(layer?.width)) && Number(layer.width) > 0 ? Number(layer.width) : 100;
-  const baseHeight = Number.isFinite(Number(layer?.height)) && Number(layer.height) > 0 ? Number(layer.height) : 100;
+  const resolvedLayer = layerType === 'shape' ? await resolveShapeLayer(layer) : layer;
+  const x = Number.isFinite(Number(resolvedLayer?.x)) ? Number(resolvedLayer.x) : 0.5;
+  const y = Number.isFinite(Number(resolvedLayer?.y)) ? Number(resolvedLayer.y) : 0.5;
+  const angle = Number.isFinite(Number(resolvedLayer?.angle)) ? Number(resolvedLayer.angle) : 0;
+  const scale =
+    Number.isFinite(Number(resolvedLayer?.scale)) && Number(resolvedLayer.scale) > 0
+      ? Number(resolvedLayer.scale)
+      : 1;
+  const baseWidth =
+    Number.isFinite(Number(resolvedLayer?.width)) && Number(resolvedLayer.width) > 0
+      ? Number(resolvedLayer.width)
+      : 100;
+  const baseHeight =
+    Number.isFinite(Number(resolvedLayer?.height)) && Number(resolvedLayer.height) > 0
+      ? Number(resolvedLayer.height)
+      : 100;
   const centerX = x * placeholderWidth;
   const centerY = y * placeholderHeight;
-  const scaleX = (layer?.flipX ? -1 : 1) * scale;
-  const scaleY = (layer?.flipY ? -1 : 1) * scale;
+  const scaleX = (resolvedLayer?.flipX ? -1 : 1) * scale;
+  const scaleY = (resolvedLayer?.flipY ? -1 : 1) * scale;
 
   let innerMarkup = '';
 
   if (layerType === 'image') {
-    innerMarkup = await buildImageLayerMarkup(layer, baseWidth, baseHeight);
+    innerMarkup = await buildImageLayerMarkup(resolvedLayer, baseWidth, baseHeight);
   } else if (layerType === 'shape') {
-    innerMarkup = buildShapeLayerMarkup(layer, baseWidth, baseHeight);
+    innerMarkup = buildShapeLayerMarkup(resolvedLayer, baseWidth, baseHeight);
   } else if (layerType === 'text' || layerType === 'careset' || layerType === 'text_layer') {
-    innerMarkup = await buildTextLayerMarkup(layer, baseWidth, baseHeight);
+    innerMarkup = await buildTextLayerMarkup(resolvedLayer, baseWidth, baseHeight);
   }
 
   if (!innerMarkup) {
