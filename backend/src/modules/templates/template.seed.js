@@ -111,7 +111,6 @@ const defaultTemplates = [
             highlightImageUrl: '/mockups/basic-tshirt/back/highlight.png',
             displacementImageUrl: '/mockups/basic-tshirt/back/displacement.png',
             grainImageUrl: '/mockups/basic-tshirt/back/grain.svg',
-            occlusionImageUrl: '/mockups/basic-tshirt/back/occlusion.svg',
           },
           blendModes: {
             shadow: 'multiply',
@@ -158,7 +157,7 @@ const defaultTemplates = [
           baseImageUrl: '/mockups/basic-tshirt/neck-label-inner/base.png',
           printArea: {
             x: 693.25,
-            y: 730.53,
+            y: 790,
             width: 480.31,
             height: 480.31,
             },
@@ -168,7 +167,13 @@ const defaultTemplates = [
             highlightImageUrl: '/mockups/basic-tshirt/neck-label-inner/highlight.svg',
             displacementImageUrl: '/mockups/basic-tshirt/neck-label-inner/displacement.svg',
             grainImageUrl: '/mockups/basic-tshirt/neck-label-inner/grain.svg',
-            occlusionImageUrl: '/mockups/basic-tshirt/neck-label-inner/occlusion.svg',
+            occlusionImageUrl: '/mockups/basic-tshirt/neck-label-inner/occlusion.png',
+          },
+          displacement: {
+            neutral: 128,
+            scaleX: 0,
+            scaleY: 0,
+            blur: 0,
           },
         },
       },

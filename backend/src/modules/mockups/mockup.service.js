@@ -727,6 +727,22 @@ async function applyMaskBuffer(sourceBuffer, maskAssetUrl, width, height) {
     .toBuffer();
 }
 
+async function applyOptionalMaskBuffer(sourceBuffer, maskAssetUrl, width, height) {
+  if (!maskAssetUrl) {
+    return sourceBuffer;
+  }
+
+  try {
+    return await applyMaskBuffer(sourceBuffer, maskAssetUrl, width, height);
+  } catch (error) {
+    if (error?.code === 'ENOENT' || String(error?.message || '').includes('Mockup asset not found')) {
+      return sourceBuffer;
+    }
+
+    throw error;
+  }
+}
+
 async function buildShadowOverlay(assetUrl, width, height) {
   if (!assetUrl) {
     return null;
@@ -1244,6 +1260,7 @@ async function renderSurfacePreview({
   const maskAssetUrl = surface.render?.assets?.maskImageUrl || surface.maskImageUrl || null;
   const shadowAssetUrl = surface.render?.assets?.shadowImageUrl || null;
   const highlightAssetUrl = surface.render?.assets?.highlightImageUrl || null;
+  const occlusionAssetUrl = surface.render?.assets?.occlusionImageUrl || null;
   const displacementAssetUrl = surface.render?.assets?.displacementImageUrl || null;
 
   if (!editorPrintArea || !renderPrintArea) {
@@ -1280,7 +1297,23 @@ async function renderSurfacePreview({
   const designSvg = await buildDesignSvg(surfacePayload, Number(editorPrintArea.width), Number(editorPrintArea.height));
   const designBuffer = await rasterizeSvgToPng(designSvg, roundDimension(renderWidth), roundDimension(renderHeight));
 
-  const placedDesign = await placeDesignOnCanvas(designBuffer, outputWidth, outputHeight, scaledRenderPrintArea);
+  // For neckLabelInner we apply a simple 2D rotation (tilt) before placing onto the mockup.
+  // This avoids relying on SVG displacement/warp pipeline (which can error for some asset types).
+  const rotationDeg = surfaceKey === 'neckLabelInner' ? 13 : 0;
+  let designBufferToPlace = designBuffer;
+  if (rotationDeg && Math.abs(rotationDeg) > 0.01) {
+    designBufferToPlace = await sharp(designBuffer)
+      .rotate(rotationDeg, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+  }
+
+  const placedDesign = await placeDesignOnCanvas(
+    designBufferToPlace,
+    outputWidth,
+    outputHeight,
+    scaledRenderPrintArea,
+  );
   const maskedDesign = await applyMaskBuffer(placedDesign, maskAssetUrl, outputWidth, outputHeight);
   const warpedDesign = await warpDesignBuffer(
     maskedDesign,
@@ -1324,13 +1357,19 @@ async function renderSurfacePreview({
         .png()
         .toBuffer()
     : shadowedDesign;
+  const occlusionMaskedDesign = await applyOptionalMaskBuffer(
+    designComposite,
+    occlusionAssetUrl,
+    outputWidth,
+    outputHeight,
+  );
 
   const baseBuffer = await rasterizeAssetToPng(baseAssetUrl, outputWidth, outputHeight);
   const mergedBuffer = await compositeBuffers({
     width: outputWidth,
     height: outputHeight,
     baseBuffer,
-    overlays: [{ input: designComposite, blend: 'over' }],
+    overlays: [{ input: occlusionMaskedDesign, blend: 'over' }],
     format,
   });
 
