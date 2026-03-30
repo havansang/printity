@@ -5,7 +5,7 @@
   "surfaceFolders": {
     "front": "front",
     "back": "back",
-    "neckLabelInner": "neck-label-inner"
+    "neckLabelInner": "front-colar-closeup"
   },
   "assets": {
     "basePattern": "/mockups/basic-tshirt/colors/{colorKey}/{surfaceFolder}/base.png",

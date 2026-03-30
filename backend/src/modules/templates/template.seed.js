@@ -134,14 +134,14 @@ const defaultTemplates = [
         printable: true,
         allowedDecorationMethods: ['dtg', 'dtf'],
         templateImageUrl: '/mockups/basic-tshirt/neck-label-inner/template.svg',
-        printArea: { x: 211.84, y: 200.9, width: 453.43, height: 453.43 },
+        printArea: { x: 288.555, y: 250, width: 300, height: 300 },
         editor: {
           sourceType: 'svg',
           svgUrl: '/mockups/basic-tshirt/neck-label-inner/editor.svg',
           sceneWidth: 877.11,
           sceneHeight: 871.85,
           placeholderId: 'placeholder_necktag',
-          printArea: { x: 211.84, y: 200.9, width: 453.43, height: 453.43 },
+          printArea: { x: 285.555, y: 250, width: 300, height: 300 },
         },
         transformPolicy: {
           positionUnit: 'normalized',
@@ -153,10 +153,15 @@ const defaultTemplates = [
           maxAspectRatioDelta: 0.01,
         },
         render: {
-          outputWidth: 877.11,
-          outputHeight: 871.85,
-          baseImageUrl: '/mockups/basic-tshirt/neck-label-inner/base.svg',
-          printArea: { x: 211.84, y: 200.9, width: 453.43, height: 453.43 },
+          outputWidth: 2048,
+          outputHeight: 2048,
+          baseImageUrl: '/mockups/basic-tshirt/neck-label-inner/base.png',
+          printArea: {
+            x: 693.25,
+            y: 730.53,
+            width: 480.31,
+            height: 480.31,
+            },
           assets: {
             maskImageUrl: '/mockups/basic-tshirt/neck-label-inner/mask.svg',
             shadowImageUrl: '/mockups/basic-tshirt/neck-label-inner/shadow.svg',

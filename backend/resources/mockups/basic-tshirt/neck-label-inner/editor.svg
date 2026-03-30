@@ -3,11 +3,11 @@
     <clipPath id="clippath">
       <rect width="877.11" height="871.85" fill="none"/>
     </clipPath>
-  <image x="0" y="0" width="877.11" height="871.85" id="fabric-image"/><path d="m877.11,90.6l-62.14-18.52-68.01-37.79s-79.62,60.67-308.92,60.67S128.2,34.5,128.2,34.5l-68.01,37.79L0,90.34v781.51h877.11V90.6Z" id="fabric-0"/><clipPath id="fabric-0-clip"><use xlink:href="#fabric-0"/></clipPath><rect id="_necktag-path" width="453.43" height="453.43" fill="none" stroke-miterlimit="10" transform=""/><clipPath><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path"/></clipPath></defs>
+  <image x="0" y="0" width="877.11" height="871.85" id="fabric-image"/><path d="m877.11,90.6l-62.14-18.52-68.01-37.79s-79.62,60.67-308.92,60.67S128.2,34.5,128.2,34.5l-68.01,37.79L0,90.34v781.51h877.11V90.6Z" id="fabric-0"/><clipPath id="fabric-0-clip"><use xlink:href="#fabric-0"/></clipPath><rect id="_necktag-path" width="300" height="300" fill="none" stroke-miterlimit="10" transform=""/><clipPath><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path"/></clipPath></defs>
   <g id="color_first" fill-rule="nonzero" fill="#fff"><use xlink:href="#fabric-0"/><use clip-path="url(#fabric-0-clip)" xlink:href="#fabric-image"/>
     
     
-  <g clip-path="url(#_necktag-clippath)" transform="translate(211.84 200.9)"><svg id="placeholder_necktag" width="453.43" height="453.43" preserveAspectRatio="xMidYMid slice" viewBox="0 0 453.43 453.43"><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path" stroke="#ffffff"/><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path" stroke="#000000" stroke-dasharray="1.9339374999999999mm, 1.9339374999999999mm"/></svg></g></g>
+  <g clip-path="url(#_necktag-clippath)" transform="translate(288.555 250)"><svg id="placeholder_necktag" width="300" height="300" preserveAspectRatio="xMidYMid slice" viewBox="0 0 300 300"><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path" stroke="#ffffff"/><use stroke-width="0.9669687499999999mm" xlink:href="#_necktag-path" stroke="#000000" stroke-dasharray="1.9339374999999999mm, 1.9339374999999999mm"/></svg></g></g>
   <g id="outlines">
     <g id="outlnes_colored">
       <g clip-path="url(#clippath)" fill="none">
