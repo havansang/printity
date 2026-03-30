@@ -11,6 +11,28 @@
     "basePattern": "/mockups/basic-polo/colors/{colorKey}/{surfaceFolder}/base.png",
     "templatePattern": "/mockups/basic-polo/colors/{colorKey}/{surfaceFolder}/template.png"
   },
+  "scenes": {
+    "front": {
+      "label": "Front",
+      "baseSurfaceKey": "front",
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "front"
+        }
+      ]
+    },
+    "back": {
+      "label": "Back",
+      "baseSurfaceKey": "back",
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "back"
+        }
+      ]
+    }
+  },
   "colors": [
     {
       "key": "white",

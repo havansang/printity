@@ -7,6 +7,92 @@ import { resolveRenderableAssetUrl } from '../shared/lib/assetUrls';
 import { templates } from '../templates/templates';
 
 const DEFAULT_TEMPLATE_KEY = 'tshirt';
+const DEFAULT_TSHIRT_PREVIEW_SCENES = [
+    {
+        key: 'front',
+        label: 'Front',
+        sortOrder: 0,
+        surfaceKeys: ['front', 'neckLabelInner'],
+        isDefault: true,
+        isActive: true,
+    },
+    {
+        key: 'back',
+        label: 'Back',
+        sortOrder: 1,
+        surfaceKeys: ['back'],
+        isDefault: false,
+        isActive: true,
+    },
+    {
+        key: 'frontCollarCloseup',
+        label: 'Front Collar Closeup',
+        sortOrder: 2,
+        surfaceKeys: ['neckLabelInner'],
+        isDefault: false,
+        isActive: true,
+    },
+    {
+        key: 'folded',
+        label: 'Folded',
+        sortOrder: 3,
+        surfaceKeys: ['front', 'neckLabelInner'],
+        isDefault: false,
+        isActive: true,
+    },
+];
+
+function normalizePreviewScenes(productType, supportedSurfaceKeys, previewScenes) {
+    const normalizedSupportedSurfaceKeys = Array.isArray(supportedSurfaceKeys)
+        ? supportedSurfaceKeys.map((key) => String(key || '').trim()).filter(Boolean)
+        : [];
+    const normalizedPreviewScenes = Array.isArray(previewScenes)
+        ? previewScenes
+            .filter((scene) => scene?.isActive !== false && scene?.key)
+            .map((scene) => ({
+                key: String(scene.key || '').trim(),
+                label: scene.label || scene.key,
+                sortOrder: scene.sortOrder ?? 0,
+                surfaceKeys: Array.isArray(scene.surfaceKeys) ? scene.surfaceKeys : [],
+                isDefault: scene.isDefault === true,
+                isActive: scene.isActive !== false,
+            }))
+        : [];
+
+    if (
+        String(productType || '').trim().toLowerCase() !== 'tshirt'
+        || !normalizedSupportedSurfaceKeys.includes('front')
+        || !normalizedSupportedSurfaceKeys.includes('back')
+        || !normalizedSupportedSurfaceKeys.includes('neckLabelInner')
+    ) {
+        return normalizedPreviewScenes;
+    }
+
+    const looksLikeLegacySurfaceFallback = normalizedPreviewScenes.length === 0
+        || normalizedPreviewScenes.every((scene) => normalizedSupportedSurfaceKeys.includes(scene.key));
+
+    if (looksLikeLegacySurfaceFallback) {
+        return DEFAULT_TSHIRT_PREVIEW_SCENES;
+    }
+
+    const defaultSceneMap = new Map(DEFAULT_TSHIRT_PREVIEW_SCENES.map((scene) => [scene.key, scene]));
+    const mergedDefaultScenes = DEFAULT_TSHIRT_PREVIEW_SCENES.map((defaultScene) => {
+        const matchedScene = normalizedPreviewScenes.find((scene) => scene.key === defaultScene.key);
+        if (!matchedScene) {
+            return defaultScene;
+        }
+
+        return {
+            ...defaultScene,
+            ...matchedScene,
+            surfaceKeys: matchedScene.surfaceKeys?.length > 0 ? matchedScene.surfaceKeys : defaultScene.surfaceKeys,
+        };
+    });
+    const extraScenes = normalizedPreviewScenes.filter((scene) => !defaultSceneMap.has(scene.key));
+
+    return [...mergedDefaultScenes, ...extraScenes];
+}
+
 const DEFAULT_TEMPLATE_DEF = {
     ...templates[DEFAULT_TEMPLATE_KEY],
     id: DEFAULT_TEMPLATE_KEY,
@@ -15,6 +101,7 @@ const DEFAULT_TEMPLATE_DEF = {
     productType: 'tshirt',
     slug: 'basic-tshirt',
     availableColors: [],
+    previewScenes: DEFAULT_TSHIRT_PREVIEW_SCENES,
 };
 
 function buildEditorTemplateDefinition(template) {
@@ -35,6 +122,7 @@ function buildEditorTemplateDefinition(template) {
         availableColors: Array.isArray(template?.availableColors) ? template.availableColors : [],
         defaultRenderOptions: template.defaultRenderOptions || null,
         supportedSurfaces: [],
+        previewScenes: [],
     };
 
     supportedSurfaceKeys.forEach((surfaceKey) => {
@@ -63,6 +151,12 @@ function buildEditorTemplateDefinition(template) {
         };
         nextDefinition.supportedSurfaces.push(surfaceKey);
     });
+
+    nextDefinition.previewScenes = normalizePreviewScenes(
+        nextDefinition.productType,
+        nextDefinition.supportedSurfaces,
+        template?.previewScenes
+    );
 
     return nextDefinition.supportedSurfaces.length > 0 ? nextDefinition : null;
 }

@@ -68,6 +68,10 @@ const placeholderSchema = z
 const mockupPreviewSchema = z
   .object({
     templateId: objectIdSchema,
+    sceneKeys: z.array(z.string().trim().min(1).max(100)).optional(),
+    surfaces: z.record(z.string().trim().min(1), z.object({
+      images: z.array(layerSchema).default([]),
+    }).passthrough()).optional(),
     print: z
       .object({
         placeholders: z.array(placeholderSchema).default([]),
@@ -84,11 +88,15 @@ const mockupPreviewSchema = z
   })
   .passthrough()
   .superRefine((value, ctx) => {
-    if (value.responseType === 'binary' && !value.surfaceKey) {
+    const sceneKeys = Array.isArray(value.sceneKeys)
+      ? value.sceneKeys.map((sceneKey) => String(sceneKey || '').trim()).filter(Boolean)
+      : [];
+
+    if (value.responseType === 'binary' && !value.surfaceKey && sceneKeys.length !== 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'surfaceKey is required when responseType is binary',
-        path: ['surfaceKey'],
+        message: 'binary preview requires exactly one target via surfaceKey or sceneKeys',
+        path: ['sceneKeys'],
       });
     }
 

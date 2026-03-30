@@ -11,6 +11,134 @@
     "basePattern": "/mockups/basic-tshirt/colors/{colorKey}/{surfaceFolder}/base.png",
     "templatePattern": "/mockups/basic-tshirt/colors/{colorKey}/{surfaceFolder}/template.png"
   },
+  "scenes": {
+    "front": {
+      "label": "Front",
+      "baseSurfaceKey": "front",
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "front"
+        },
+        {
+          "type": "surface",
+          "surfaceKey": "neckLabelInner",
+          "inheritSurfaceRender": false,
+          "printArea": {
+            "x": 943,
+            "y": 143,
+            "width": 162,
+            "height": 132
+          }
+        },
+        {
+          "type": "overlay",
+          "assetUrl": "/mockups/basic-tshirt/front/occlusion.svg",
+          "blend": "over"
+        }
+      ]
+    },
+    "back": {
+      "label": "Back",
+      "baseSurfaceKey": "back",
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "back"
+        }
+      ]
+    },
+    "frontCollarCloseup": {
+      "label": "Front Collar Closeup",
+      "basePattern": "/mockups/basic-tshirt/colors/{colorKey}/neck-label-inner/base.png",
+      "baseImageUrl": "/mockups/basic-tshirt/neck-label-inner/base.svg",
+      "outputWidth": 877.11,
+      "outputHeight": 871.85,
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "neckLabelInner"
+        }
+      ]
+    },
+    "folded": {
+      "label": "Folded",
+      "basePattern": "/mockups/basic-tshirt/colors/{colorKey}/folded/base.png",
+      "baseImageUrl": "/mockups/basic-tshirt/folded/base.png",
+      "outputWidth": 2048,
+      "outputHeight": 2048,
+      "layers": [
+        {
+          "type": "surface",
+          "surfaceKey": "front",
+          "inheritSurfaceRender": false,
+          "configuredWidth": 2048,
+          "configuredHeight": 2048,
+          "printArea": {
+            "x": 0,
+            "y": 0,
+            "width": 697,
+            "height": 902
+          },
+          "printQuad": {
+            "topLeft": {
+              "x": 646.6467391304348,
+              "y": 625.8396739130435
+            },
+            "topRight": {
+              "x": 1184.5489130434783,
+              "y": 682.6603260869565
+            },
+            "bottomRight": {
+              "x": 1111.016304347826,
+              "y": 1471.9103260869565
+            },
+            "bottomLeft": {
+              "x": 573.1141304347826,
+              "y": 1415.0896739130435
+            }
+          },
+          "assets": {
+            "maskImageUrl": "/mockups/basic-tshirt/folded/mask.png",
+            "shadowImageUrl": "/mockups/basic-tshirt/folded/shadow.png",
+            "highlightImageUrl": "/mockups/basic-tshirt/folded/highlight.png",
+            "displacementImageUrl": "/mockups/basic-tshirt/folded/displacement.png"
+          }
+        },
+        {
+          "type": "surface",
+          "surfaceKey": "neckLabelInner",
+          "inheritSurfaceRender": false,
+          "configuredWidth": 2048,
+          "configuredHeight": 2048,
+          "printArea": {
+            "x": 0,
+            "y": 0,
+            "width": 453.43,
+            "height": 453.43
+          },
+          "printQuad": {
+            "topLeft": {
+              "x": 884.3097826086956,
+              "y": 520.5217391304348
+            },
+            "topRight": {
+              "x": 1009.3315217391304,
+              "y": 533.7282608695652
+            },
+            "bottomRight": {
+              "x": 998.570652173913,
+              "y": 649.2282608695652
+            },
+            "bottomLeft": {
+              "x": 873.5489130434783,
+              "y": 636.0217391304348
+            }
+          }
+        }
+      ]
+    }
+  },
   "colors": [
     {
       "key": "white",

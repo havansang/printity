@@ -8,6 +8,8 @@
     "dev": "nodemon src/server.js",
     "seed:templates": "node scripts/seed-templates.js",
     "seed:shapes": "node scripts/seed-shapes.js",
+    "debug:mockup-preview": "node scripts/debug-mockup-preview.js",
+    "generate:folded-tshirt-assets": "node scripts/generate-folded-tshirt-assets.js",
     "sync:fonts": "node scripts/sync-fonts.js",
     "cleanup:basic-polo-colors": "node scripts/cleanup-empty-basic-polo-colors.js"
   },

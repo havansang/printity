@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditor } from './EditorContext';
 import {
     buildSurfacePreview,
@@ -9,14 +9,37 @@ import {
     buildMockupFilename,
     buildMockupPreviewPayload,
     canUseMockupPreviewApi,
+    createMockupPreviewRequest,
+    resolveMockupPreviewSize,
 } from './mockupPreviewPayload';
-import { previewMockups } from '../../shared/api/mockupApi';
+import { previewMockups, previewMockupsBinary } from '../../shared/api/mockupApi';
 
+const THUMBNAIL_PREVIEW_SIZE = 400;
+const MAX_SERVER_PREVIEW_RESPONSE_CACHE_ENTRIES = 24;
+const MAX_SERVER_PREVIEW_BINARY_CACHE_ENTRIES = 24;
 const SERVER_PREVIEW_RESPONSE_CACHE = new Map();
 const SERVER_PREVIEW_REQUEST_CACHE = new Map();
+const SERVER_PREVIEW_BINARY_RESPONSE_CACHE = new Map();
+const SERVER_PREVIEW_BINARY_REQUEST_CACHE = new Map();
+
+function setLruCacheEntry(cache, key, value, maxEntries, onEvict) {
+    if (cache.has(key)) {
+        cache.delete(key);
+    }
+
+    cache.set(key, value);
+
+    while (cache.size > maxEntries) {
+        const oldestKey = cache.keys().next().value;
+        const oldestValue = cache.get(oldestKey);
+        cache.delete(oldestKey);
+        onEvict?.(oldestValue, oldestKey);
+    }
+}
 
 function buildPreviewStateKey({
     orderedSurfaceDefs,
+    orderedSceneDefs,
     snapshots,
     surfacePrintAreas,
     shirtColor,
@@ -34,6 +57,7 @@ function buildPreviewStateKey({
         ).trim(),
         shirtColor: String(shirtColor || '').trim(),
         surfaceKeys: orderedSurfaceDefs.map((surfaceDef) => surfaceDef.key),
+        sceneKeys: orderedSceneDefs.map((sceneDef) => sceneDef.key),
         snapshots: orderedSurfaceDefs.map((surfaceDef) => snapshots?.[surfaceDef.key] || null),
         printAreas: orderedSurfaceDefs.map((surfaceDef) => ({
             key: surfaceDef.key,
@@ -52,6 +76,117 @@ function triggerDownload(href, filename) {
     anchor.href = href;
     anchor.download = filename;
     anchor.click();
+}
+
+function buildPreviewRequestKey(payload) {
+    return JSON.stringify(payload);
+}
+
+async function requestServerPreview(payload) {
+    const requestKey = buildPreviewRequestKey(payload);
+
+    if (SERVER_PREVIEW_RESPONSE_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_RESPONSE_CACHE.get(requestKey);
+    }
+
+    if (SERVER_PREVIEW_REQUEST_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_REQUEST_CACHE.get(requestKey);
+    }
+
+    const request = previewMockups(payload)
+        .then((response) => {
+            setLruCacheEntry(
+                SERVER_PREVIEW_RESPONSE_CACHE,
+                requestKey,
+                response,
+                MAX_SERVER_PREVIEW_RESPONSE_CACHE_ENTRIES
+            );
+            return response;
+        })
+        .finally(() => {
+            SERVER_PREVIEW_REQUEST_CACHE.delete(requestKey);
+        });
+
+    SERVER_PREVIEW_REQUEST_CACHE.set(requestKey, request);
+    return request;
+}
+
+async function requestServerBinaryPreview(payload) {
+    const requestKey = buildPreviewRequestKey(payload);
+
+    if (SERVER_PREVIEW_BINARY_RESPONSE_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_BINARY_RESPONSE_CACHE.get(requestKey);
+    }
+
+    if (SERVER_PREVIEW_BINARY_REQUEST_CACHE.has(requestKey)) {
+        return SERVER_PREVIEW_BINARY_REQUEST_CACHE.get(requestKey);
+    }
+
+    const request = previewMockupsBinary(payload)
+        .then((response) => {
+            const objectUrl = URL.createObjectURL(response.blob);
+            const cachedResponse = {
+                objectUrl,
+                mimeType: response.mimeType,
+            };
+
+            setLruCacheEntry(
+                SERVER_PREVIEW_BINARY_RESPONSE_CACHE,
+                requestKey,
+                cachedResponse,
+                MAX_SERVER_PREVIEW_BINARY_CACHE_ENTRIES,
+                (evictedValue) => {
+                    if (evictedValue?.objectUrl) {
+                        URL.revokeObjectURL(evictedValue.objectUrl);
+                    }
+                }
+            );
+
+            return cachedResponse;
+        })
+        .finally(() => {
+            SERVER_PREVIEW_BINARY_REQUEST_CACHE.delete(requestKey);
+        });
+
+    SERVER_PREVIEW_BINARY_REQUEST_CACHE.set(requestKey, request);
+    return request;
+}
+
+function getOrderedSurfaceDefs(surfaceDefs) {
+    const preferredOrder = ['front', 'back', 'neckLabelInner'];
+    const orderMap = new Map(preferredOrder.map((surfaceKey, index) => [surfaceKey, index]));
+
+    return [...surfaceDefs].sort((left, right) => {
+        const leftOrder = orderMap.get(left?.key);
+        const rightOrder = orderMap.get(right?.key);
+
+        if (leftOrder !== undefined || rightOrder !== undefined) {
+            return (leftOrder ?? Number.MAX_SAFE_INTEGER) - (rightOrder ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        return 0;
+    });
+}
+
+function getOrderedSceneDefs(templateDef, orderedSurfaceDefs) {
+    const templateScenes = Array.isArray(templateDef?.previewScenes)
+        ? templateDef.previewScenes.filter((scene) => scene?.isActive !== false && scene?.key)
+        : [];
+
+    if (templateScenes.length > 0) {
+        return [...templateScenes].sort((left, right) => (
+            (left?.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right?.sortOrder ?? Number.MAX_SAFE_INTEGER)
+        ));
+    }
+
+    return orderedSurfaceDefs.map((surfaceDef, index) => ({
+        key: surfaceDef.key,
+        label: surfaceDef.label,
+        sortOrder: index,
+        surfaceKeys: [surfaceDef.key],
+        isDefault: index === 0,
+        isActive: true,
+    }));
 }
 
 async function buildClientPreviewItems({
@@ -90,11 +225,11 @@ async function buildClientPreviewItems({
 
         return {
             source: 'client',
-            surface,
+            scene: surface,
             label: surfaceDef.label,
             filename: buildMockupFilename({
                 templateDef,
-                surfaceKey: surface,
+                sceneKey: surface,
                 format: 'png',
                 mimeType: 'image/png',
             }),
@@ -112,76 +247,42 @@ async function buildClientPreviewItems({
     };
 }
 
-function mapApiPreviewItems({ response, surfaceDefs, templateDef }) {
+function mapApiPreviewItems({ response, sceneDefs, templateDef }) {
     const previews = Array.isArray(response?.data?.previews) ? response.data.previews : [];
-    const labelsBySurface = new Map(surfaceDefs.map((surfaceDef) => [surfaceDef.key, surfaceDef.label]));
-    const surfaceOrder = new Map(surfaceDefs.map((surfaceDef, index) => [surfaceDef.key, index]));
+    const labelsByScene = new Map(sceneDefs.map((sceneDef) => [sceneDef.key, sceneDef.label]));
+    const sceneOrder = new Map(sceneDefs.map((sceneDef, index) => [sceneDef.key, index]));
 
     return previews
-        .map((preview) => ({
-            source: 'server',
-            surface: preview.surfaceKey,
-            label: labelsBySurface.get(preview.surfaceKey) || preview.surfaceKey,
-            filename: buildMockupFilename({
-                templateDef,
-                surfaceKey: preview.surfaceKey,
-                format: response?.data?.format,
+        .map((preview) => {
+            const sceneKey = preview.sceneKey || preview.surfaceKey;
+
+            return {
+                source: 'server',
+                scene: sceneKey,
+                label: preview.label || labelsByScene.get(sceneKey) || sceneKey,
+                filename: buildMockupFilename({
+                    templateDef,
+                    sceneKey,
+                    format: response?.data?.format,
+                    mimeType: preview.mimeType,
+                }),
+                previewUrl: preview.dataUrl,
+                thumbnailUrl: preview.dataUrl,
+                fullPreviewUrl: null,
+                hasFullResolution: false,
+                width: preview.width,
+                height: preview.height,
                 mimeType: preview.mimeType,
-            }),
-            previewUrl: preview.dataUrl,
-            dataUrl: preview.dataUrl,
-            width: preview.width,
-            height: preview.height,
-            mimeType: preview.mimeType,
-        }))
+            };
+        })
         .sort((left, right) => (
-            (surfaceOrder.get(left.surface) ?? Number.MAX_SAFE_INTEGER)
-            - (surfaceOrder.get(right.surface) ?? Number.MAX_SAFE_INTEGER)
+            (sceneOrder.get(left.scene) ?? Number.MAX_SAFE_INTEGER)
+            - (sceneOrder.get(right.scene) ?? Number.MAX_SAFE_INTEGER)
         ));
 }
 
-function buildPreviewRequestKey(payload) {
-    return JSON.stringify(payload);
-}
-
-async function requestServerPreview(payload) {
-    const requestKey = buildPreviewRequestKey(payload);
-
-    if (SERVER_PREVIEW_RESPONSE_CACHE.has(requestKey)) {
-        return SERVER_PREVIEW_RESPONSE_CACHE.get(requestKey);
-    }
-
-    if (SERVER_PREVIEW_REQUEST_CACHE.has(requestKey)) {
-        return SERVER_PREVIEW_REQUEST_CACHE.get(requestKey);
-    }
-
-    const request = previewMockups(payload)
-        .then((response) => {
-            SERVER_PREVIEW_RESPONSE_CACHE.set(requestKey, response);
-            return response;
-        })
-        .finally(() => {
-            SERVER_PREVIEW_REQUEST_CACHE.delete(requestKey);
-        });
-
-    SERVER_PREVIEW_REQUEST_CACHE.set(requestKey, request);
-    return request;
-}
-
-function getOrderedSurfaceDefs(surfaceDefs) {
-    const preferredOrder = ['front', 'back', 'neckLabelInner'];
-    const orderMap = new Map(preferredOrder.map((surfaceKey, index) => [surfaceKey, index]));
-
-    return [...surfaceDefs].sort((left, right) => {
-        const leftOrder = orderMap.get(left?.key);
-        const rightOrder = orderMap.get(right?.key);
-
-        if (leftOrder !== undefined || rightOrder !== undefined) {
-            return (leftOrder ?? Number.MAX_SAFE_INTEGER) - (rightOrder ?? Number.MAX_SAFE_INTEGER);
-        }
-
-        return 0;
-    });
+function getPreviewDisplayUrl(item) {
+    return item?.fullPreviewUrl || item?.thumbnailUrl || item?.previewUrl || '';
 }
 
 export default function PreviewWorkspace() {
@@ -202,22 +303,30 @@ export default function PreviewWorkspace() {
     } = useEditor();
 
     const orderedSurfaceDefs = useMemo(() => getOrderedSurfaceDefs(surfaceDefs), [surfaceDefs]);
-    const initialSurfaceKey = orderedSurfaceDefs[0]?.key || '';
-    const [previewItemsBySurface, setPreviewItemsBySurface] = useState({});
-    const previewItemsBySurfaceRef = useRef({});
-    const previewSessionRef = useRef({ id: 0, snapshots: null });
+    const orderedSceneDefs = useMemo(
+        () => getOrderedSceneDefs(templateDef, orderedSurfaceDefs),
+        [orderedSurfaceDefs, templateDef]
+    );
+    const initialSceneKey = orderedSceneDefs.find((scene) => scene.isDefault)?.key || orderedSceneDefs[0]?.key || '';
+    const [previewItemsByScene, setPreviewItemsByScene] = useState({});
+    const previewItemsBySceneRef = useRef({});
     const previewObjectUrlsRef = useRef([]);
     const previewBuildSignatureRef = useRef('');
-    const [selectedSurface, setSelectedSurface] = useState(initialSurfaceKey);
+    const serverBasePayloadRef = useRef(null);
+    const [selectedScene, setSelectedScene] = useState(initialSceneKey);
     const [isLoading, setIsLoading] = useState(true);
-    const [loadingSurface, setLoadingSurface] = useState('');
+    const [loadingFullScene, setLoadingFullScene] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const [downloadSurface, setDownloadSurface] = useState('');
+    const [downloadScene, setDownloadScene] = useState('');
     const [saveMessage, setSaveMessage] = useState('');
+    const fullPreviewSize = useMemo(
+        () => resolveMockupPreviewSize(templateDef?.defaultRenderOptions?.size || 2048),
+        [templateDef]
+    );
 
     useEffect(() => {
-        previewItemsBySurfaceRef.current = previewItemsBySurface;
-    }, [previewItemsBySurface]);
+        previewItemsBySceneRef.current = previewItemsByScene;
+    }, [previewItemsByScene]);
 
     useEffect(() => (
         () => {
@@ -226,79 +335,9 @@ export default function PreviewWorkspace() {
         }
     ), []);
 
-    const loadServerSurfacePreview = useCallback(async (surfaceKey, snapshotsOverride = null, sessionIdOverride = null) => {
-        const snapshots = snapshotsOverride || previewSessionRef.current.snapshots;
-        const sessionId = sessionIdOverride ?? previewSessionRef.current.id;
-        const surfaceDef = orderedSurfaceDefs.find((surface) => surface.key === surfaceKey);
-
-        if (!surfaceKey || !surfaceDef || !snapshots) {
-            return null;
-        }
-
-        if (previewItemsBySurfaceRef.current[surfaceKey]) {
-            return previewItemsBySurfaceRef.current[surfaceKey];
-        }
-
-        const payload = await buildMockupPreviewPayload({
-            templateDef,
-            surfaceDef,
-            surfacePrintAreas,
-            snapshots,
-            liveCanvas: surfaceKey === activeSurface ? canvasRef.current : null,
-            shirtColor,
-            shirtColors,
-            uploadedImages,
-        });
-
-        if (!payload) {
-            return null;
-        }
-
-        setLoadingSurface(surfaceKey);
-
-        try {
-            const response = await requestServerPreview(payload);
-            const item = mapApiPreviewItems({
-                response,
-                surfaceDefs,
-                templateDef,
-            })[0] || null;
-
-            if (previewSessionRef.current.id !== sessionId || !item) {
-                return item;
-            }
-
-            setPreviewItemsBySurface((current) => {
-                if (current[surfaceKey]) {
-                    return current;
-                }
-
-                return {
-                    ...current,
-                    [surfaceKey]: item,
-                };
-            });
-
-            return item;
-        } finally {
-            if (previewSessionRef.current.id === sessionId) {
-                setLoadingSurface((current) => (current === surfaceKey ? '' : current));
-            }
-        }
-    }, [
-        orderedSurfaceDefs,
-        activeSurface,
-        canvasRef,
-        shirtColor,
-        shirtColors,
-        surfaceDefs,
-        surfacePrintAreas,
-        templateDef,
-        uploadedImages,
-    ]);
-
     useEffect(() => {
         if (!isPreviewMode) {
+            serverBasePayloadRef.current = null;
             return undefined;
         }
 
@@ -311,22 +350,86 @@ export default function PreviewWorkspace() {
 
             try {
                 const snapshots = captureSurfaceSnapshots();
-                const nextInitialSurfaceKey = orderedSurfaceDefs[0]?.key || '';
+                const nextInitialSceneKey = orderedSceneDefs.find((scene) => scene.isDefault)?.key || orderedSceneDefs[0]?.key || '';
                 const nextBuildSignature = buildPreviewStateKey({
                     orderedSurfaceDefs,
+                    orderedSceneDefs,
                     snapshots,
                     surfacePrintAreas,
                     shirtColor,
                     templateDef,
                     uploadedImages,
                 });
-                const hasCachedPreviews = Object.keys(previewItemsBySurfaceRef.current).length > 0;
+                const hasCachedPreviews = Object.keys(previewItemsBySceneRef.current).length > 0;
+                const hasMatchingBuildSignature = previewBuildSignatureRef.current === nextBuildSignature;
 
-                if (previewBuildSignatureRef.current === nextBuildSignature && hasCachedPreviews) {
-                    setSelectedSurface((current) => (
-                        orderedSurfaceDefs.some((surface) => surface.key === current)
+                if (canUseMockupPreviewApi(templateDef)) {
+                    const liveCanvasBySurface = activeSurface
+                        ? { [activeSurface]: canvasRef.current }
+                        : {};
+                    const basePayload = await buildMockupPreviewPayload({
+                        templateDef,
+                        surfaceDefs: orderedSurfaceDefs,
+                        sceneDefs: orderedSceneDefs,
+                        surfacePrintAreas,
+                        snapshots,
+                        liveCanvasBySurface,
+                        shirtColor,
+                        shirtColors,
+                        uploadedImages,
+                    });
+
+                    if (!basePayload) {
+                        throw new Error('Failed to build preview payload');
+                    }
+
+                    serverBasePayloadRef.current = basePayload;
+
+                    if (hasMatchingBuildSignature && hasCachedPreviews) {
+                        setSelectedScene((current) => (
+                            orderedSceneDefs.some((scene) => scene.key === current)
+                                ? current
+                                : nextInitialSceneKey
+                        ));
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    previewBuildSignatureRef.current = nextBuildSignature;
+                    const thumbnailPayload = createMockupPreviewRequest(basePayload, {
+                        size: THUMBNAIL_PREVIEW_SIZE,
+                        responseType: 'json',
+                    });
+                    const response = await requestServerPreview(thumbnailPayload);
+                    const items = mapApiPreviewItems({
+                        response,
+                        sceneDefs: orderedSceneDefs,
+                        templateDef,
+                    });
+                    const nextPreviewItemsByScene = Object.fromEntries(
+                        items.map((item) => [item.scene, item])
+                    );
+
+                    if (cancelled) {
+                        return;
+                    }
+
+                    previewItemsBySceneRef.current = nextPreviewItemsByScene;
+                    setPreviewItemsByScene(nextPreviewItemsByScene);
+                    setSelectedScene((current) => (
+                        items.some((item) => item.scene === current)
                             ? current
-                            : nextInitialSurfaceKey
+                            : items[0]?.scene || nextInitialSceneKey
+                    ));
+                    setIsLoading(false);
+                    return;
+                }
+
+                if (hasMatchingBuildSignature && hasCachedPreviews) {
+                    setSelectedScene((current) => (
+                        orderedSceneDefs.some((scene) => scene.key === current)
+                            ? current
+                            : nextInitialSceneKey
                     ));
                     setIsLoading(false);
                     return;
@@ -334,45 +437,8 @@ export default function PreviewWorkspace() {
 
                 previewBuildSignatureRef.current = nextBuildSignature;
 
-                if (canUseMockupPreviewApi(templateDef)) {
-                    const nextSessionId = previewSessionRef.current.id + 1;
-                    previewSessionRef.current = {
-                        id: nextSessionId,
-                        snapshots,
-                    };
-                    previewItemsBySurfaceRef.current = {};
-                    setPreviewItemsBySurface({});
-                    setSelectedSurface((current) => (
-                        orderedSurfaceDefs.some((surface) => surface.key === current)
-                            ? current
-                            : nextInitialSurfaceKey
-                    ));
-
-                    if (nextInitialSurfaceKey) {
-                        await loadServerSurfacePreview(nextInitialSurfaceKey, snapshots, nextSessionId);
-                        if (!cancelled && previewSessionRef.current.id === nextSessionId) {
-                            setIsLoading(false);
-                        }
-
-                        for (const surfaceDef of orderedSurfaceDefs) {
-                            if (surfaceDef.key === nextInitialSurfaceKey) {
-                                continue;
-                            }
-
-                            if (cancelled || previewSessionRef.current.id !== nextSessionId) {
-                                break;
-                            }
-
-                            await loadServerSurfacePreview(surfaceDef.key, snapshots, nextSessionId);
-                        }
-                    } else if (!cancelled) {
-                        setIsLoading(false);
-                    }
-                    return;
-                }
-
                 const fallback = await buildClientPreviewItems({
-                    surfaceDefs,
+                    surfaceDefs: orderedSurfaceDefs,
                     snapshots,
                     surfacePrintAreas,
                     shirtColor,
@@ -386,23 +452,20 @@ export default function PreviewWorkspace() {
 
                 previewObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
                 previewObjectUrlsRef.current = fallback.objectUrls;
-                const nextPreviewItemsBySurface = Object.fromEntries(
-                    fallback.items.map((item) => [item.surface, item])
+                const nextPreviewItemsByScene = Object.fromEntries(
+                    fallback.items.map((item) => [item.scene, item])
                 );
-                previewItemsBySurfaceRef.current = nextPreviewItemsBySurface;
-                setPreviewItemsBySurface(nextPreviewItemsBySurface);
-                setSelectedSurface((current) => (
-                    fallback.items.some((item) => item.surface === current)
+                previewItemsBySceneRef.current = nextPreviewItemsByScene;
+                setPreviewItemsByScene(nextPreviewItemsByScene);
+                setSelectedScene((current) => (
+                    fallback.items.some((item) => item.scene === current)
                         ? current
-                        : fallback.items[0]?.surface || nextInitialSurfaceKey
+                        : fallback.items[0]?.scene || nextInitialSceneKey
                 ));
                 setIsLoading(false);
             } catch (error) {
                 if (!cancelled) {
                     setErrorMessage(error?.message || 'Failed to build preview');
-                }
-            } finally {
-                if (!cancelled) {
                     setIsLoading(false);
                 }
             }
@@ -415,8 +478,10 @@ export default function PreviewWorkspace() {
         };
     }, [
         isPreviewMode,
+        activeSurface,
+        canvasRef,
         captureSurfaceSnapshots,
-        loadServerSurfacePreview,
+        orderedSceneDefs,
         orderedSurfaceDefs,
         shirtColor,
         shirtColors,
@@ -425,43 +490,115 @@ export default function PreviewWorkspace() {
         templateDef,
     ]);
 
+    async function ensureSceneFullPreview(sceneKey, expectedBuildSignature = previewBuildSignatureRef.current) {
+        if (!sceneKey || !canUseMockupPreviewApi(templateDef)) {
+            return previewItemsBySceneRef.current[sceneKey] || null;
+        }
+
+        const currentItem = previewItemsBySceneRef.current[sceneKey];
+        if (!currentItem || currentItem.fullPreviewUrl || !serverBasePayloadRef.current) {
+            return currentItem || null;
+        }
+
+        const fullPayload = createMockupPreviewRequest(serverBasePayloadRef.current, {
+            sceneKeys: [sceneKey],
+            responseType: 'binary',
+            size: fullPreviewSize,
+        });
+        const response = await requestServerBinaryPreview(fullPayload);
+
+        if (previewBuildSignatureRef.current !== expectedBuildSignature) {
+            return previewItemsBySceneRef.current[sceneKey] || null;
+        }
+
+        const nextItem = {
+            ...currentItem,
+            fullPreviewUrl: response.objectUrl,
+            hasFullResolution: true,
+            fullMimeType: response.mimeType,
+            fullSize: fullPreviewSize,
+        };
+        const nextPreviewItemsByScene = {
+            ...previewItemsBySceneRef.current,
+            [sceneKey]: nextItem,
+        };
+
+        previewItemsBySceneRef.current = nextPreviewItemsByScene;
+        setPreviewItemsByScene(nextPreviewItemsByScene);
+        return nextItem;
+    }
+
     useEffect(() => {
-        if (!isPreviewMode) {
-            return;
+        if (!isPreviewMode || !selectedScene || !canUseMockupPreviewApi(templateDef)) {
+            setLoadingFullScene('');
+            return undefined;
         }
 
-        if (!canUseMockupPreviewApi(templateDef)) {
-            return;
+        const selectedPreviewItem = previewItemsBySceneRef.current[selectedScene];
+        if (!selectedPreviewItem || selectedPreviewItem.fullPreviewUrl) {
+            setLoadingFullScene((current) => (current === selectedScene ? '' : current));
+            return undefined;
         }
 
-        if (!selectedSurface || previewItemsBySurface[selectedSurface] || !previewSessionRef.current.snapshots) {
-            return;
-        }
+        let cancelled = false;
+        const expectedBuildSignature = previewBuildSignatureRef.current;
 
-        void loadServerSurfacePreview(selectedSurface);
-    }, [isPreviewMode, loadServerSurfacePreview, previewItemsBySurface, selectedSurface, templateDef]);
+        setLoadingFullScene(selectedScene);
+
+        ensureSceneFullPreview(selectedScene, expectedBuildSignature)
+            .catch((error) => {
+                if (!cancelled && previewBuildSignatureRef.current === expectedBuildSignature) {
+                    setErrorMessage(error?.message || 'Failed to load full-resolution preview');
+                }
+            })
+            .finally(() => {
+                if (!cancelled && previewBuildSignatureRef.current === expectedBuildSignature) {
+                    setLoadingFullScene((current) => (current === selectedScene ? '' : current));
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isPreviewMode, previewItemsByScene, selectedScene, templateDef, fullPreviewSize]);
 
     const previewItems = useMemo(
-        () => orderedSurfaceDefs
-            .map((surfaceDef) => previewItemsBySurface[surfaceDef.key])
+        () => orderedSceneDefs
+            .map((sceneDef) => previewItemsByScene[sceneDef.key])
             .filter(Boolean),
-        [orderedSurfaceDefs, previewItemsBySurface]
+        [orderedSceneDefs, previewItemsByScene]
     );
 
     const selectedItem = useMemo(
-        () => previewItemsBySurface[selectedSurface] || previewItems[0] || null,
-        [previewItems, previewItemsBySurface, selectedSurface]
+        () => previewItemsByScene[selectedScene] || previewItems[0] || null,
+        [previewItems, previewItemsByScene, selectedScene]
+    );
+    const selectedItemPreviewUrl = selectedItem ? getPreviewDisplayUrl(selectedItem) : '';
+    const isSelectedSceneLoadingFullPreview = Boolean(
+        selectedItem
+        && selectedItem.source === 'server'
+        && !selectedItem.fullPreviewUrl
+        && loadingFullScene === selectedItem.scene
     );
 
     const handleDownload = async (item) => {
         if (!item) return;
 
         try {
-            setDownloadSurface(item.surface);
+            setDownloadScene(item.scene);
             setErrorMessage('');
 
-            if (item.dataUrl) {
-                triggerDownload(item.dataUrl, item.filename);
+            if (item.source === 'server') {
+                const downloadableItem = item.fullPreviewUrl
+                    ? item
+                    : await ensureSceneFullPreview(item.scene);
+
+                const downloadUrl = getPreviewDisplayUrl(downloadableItem || item);
+                if (!downloadUrl) {
+                    throw new Error('Full-resolution preview is unavailable');
+                }
+
+                triggerDownload(downloadUrl, item.filename);
                 return;
             }
 
@@ -473,11 +610,12 @@ export default function PreviewWorkspace() {
         } catch (error) {
             setErrorMessage(error?.message || 'Failed to export preview');
         } finally {
-            setDownloadSurface('');
+            setDownloadScene('');
         }
     };
 
     const handleSaveProduct = async () => {
+        setErrorMessage('');
         setSaveMessage('');
         const result = await saveProduct();
         if (!result?.ok) {
@@ -489,7 +627,7 @@ export default function PreviewWorkspace() {
         <section className="preview-shell" id="preview-workspace">
             <div className="preview-viewer">
                 <div className="preview-stage">
-                    {!selectedItem && (isLoading || loadingSurface === selectedSurface) && (
+                    {!selectedItem && isLoading && (
                         <div className="preview-placeholder">
                             <Spinner />
                             <span>Rendering mockup...</span>
@@ -497,14 +635,22 @@ export default function PreviewWorkspace() {
                     )}
 
                     {selectedItem && (
-                        <img
-                            className="preview-stage-image"
-                            src={selectedItem.previewUrl}
-                            alt={selectedItem.label}
-                        />
+                        <>
+                            <img
+                                className="preview-stage-image"
+                                src={selectedItemPreviewUrl}
+                                alt={selectedItem.label}
+                            />
+                            {isSelectedSceneLoadingFullPreview && (
+                                <div className="preview-placeholder">
+                                    <Spinner />
+                                    <span>Loading full-resolution preview...</span>
+                                </div>
+                            )}
+                        </>
                     )}
 
-                    {!isLoading && loadingSurface !== selectedSurface && !selectedItem && (
+                    {!isLoading && !selectedItem && (
                         <div className="preview-placeholder">
                             <span>No preview available.</span>
                         </div>
@@ -524,28 +670,27 @@ export default function PreviewWorkspace() {
                 {saveMessage && <p className="preview-status preview-sidebar-message">{saveMessage}</p>}
 
                 <div className="preview-thumb-grid">
-                    {orderedSurfaceDefs.map((surfaceDef) => {
-                        const item = previewItemsBySurface[surfaceDef.key] || null;
-                        const isActive = surfaceDef.key === selectedSurface;
-                        const isPending = loadingSurface === surfaceDef.key;
+                    {orderedSceneDefs.map((sceneDef) => {
+                        const item = previewItemsByScene[sceneDef.key] || null;
+                        const isActive = sceneDef.key === selectedScene;
 
                         return (
                             <button
-                                key={surfaceDef.key}
+                                key={sceneDef.key}
                                 type="button"
                                 className={`preview-thumb${isActive ? ' active' : ''}`}
-                                onClick={() => setSelectedSurface(surfaceDef.key)}
+                                onClick={() => setSelectedScene(sceneDef.key)}
                             >
                                 <span className="preview-thumb-frame">
-                                    {item?.previewUrl ? (
-                                        <img src={item.previewUrl} alt={surfaceDef.label} />
+                                    {getPreviewDisplayUrl(item) ? (
+                                        <img src={item?.thumbnailUrl || item?.previewUrl} alt={sceneDef.label} />
                                     ) : (
                                         <span className="preview-thumb-placeholder">
-                                            {isPending ? 'Loading...' : 'Open'}
+                                            {isLoading ? 'Loading...' : 'Open'}
                                         </span>
                                     )}
                                 </span>
-                                <span className="preview-thumb-label">{surfaceDef.label}</span>
+                                <span className="preview-thumb-label">{sceneDef.label}</span>
                             </button>
                         );
                     })}
@@ -559,10 +704,10 @@ export default function PreviewWorkspace() {
                             type="button"
                             className="preview-footer-btn preview-footer-download"
                             onClick={() => handleDownload(selectedItem)}
-                            disabled={downloadSurface === selectedItem.surface}
+                            disabled={downloadScene === selectedItem.scene}
                         >
                             <DownloadIcon />
-                            {downloadSurface === selectedItem.surface ? 'Preparing download...' : 'Download mockup'}
+                            {downloadScene === selectedItem.scene ? 'Preparing download...' : 'Download mockup'}
                         </button>
                     )}
                 </div>

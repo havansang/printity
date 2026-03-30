@@ -84,6 +84,18 @@ const printQuadSchema = new mongoose.Schema(
   },
 );
 
+const sourceCropSchema = new mongoose.Schema(
+  {
+    x: { type: Number, required: true },
+    y: { type: Number, required: true },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
+  },
+  {
+    _id: false,
+  },
+);
+
 const renderAssetsSchema = new mongoose.Schema(
   {
     maskImageUrl: { type: String, trim: true, default: null },
@@ -214,6 +226,62 @@ const defaultRenderOptionsSchema = new mongoose.Schema(
   },
 );
 
+const previewSceneLayerSchema = new mongoose.Schema(
+  {
+    type: { type: String, trim: true, default: 'surface' },
+    surfaceKey: { type: String, enum: SURFACE_KEYS, default: null },
+    assetUrl: { type: String, trim: true, default: null },
+    blend: { type: String, trim: true, default: null },
+    inheritSurfaceRender: { type: Boolean, default: true },
+    rotationDeg: { type: Number, default: 0 },
+    configuredWidth: { type: Number, default: null },
+    configuredHeight: { type: Number, default: null },
+    editorPrintArea: { type: printAreaSchema, default: null },
+    sourceCrop: { type: sourceCropSchema, default: null },
+    printArea: { type: printAreaSchema, default: null },
+    printQuad: { type: printQuadSchema, default: null },
+    assets: { type: renderAssetsSchema, default: () => ({}) },
+    blendModes: { type: blendModesSchema, default: () => ({}) },
+    displacement: { type: displacementSchema, default: () => ({}) },
+  },
+  {
+    _id: false,
+  },
+);
+
+const previewSceneRenderSchema = new mongoose.Schema(
+  {
+    baseSurfaceKey: { type: String, enum: SURFACE_KEYS, default: null },
+    baseImageUrl: { type: String, trim: true, default: null },
+    basePattern: { type: String, trim: true, default: null },
+    outputWidth: { type: Number, default: null },
+    outputHeight: { type: Number, default: null },
+    layers: { type: [previewSceneLayerSchema], default: () => [] },
+    overlays: { type: [previewSceneLayerSchema], default: () => [] },
+  },
+  {
+    _id: false,
+  },
+);
+
+const previewSceneSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true },
+    label: { type: String, required: true, trim: true },
+    sortOrder: { type: Number, default: 0 },
+    surfaceKeys: {
+      type: [String],
+      default: () => [],
+    },
+    isDefault: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
+    render: { type: previewSceneRenderSchema, default: null },
+  },
+  {
+    _id: false,
+  },
+);
+
 const surfaceSchema = new mongoose.Schema(
   {
     key: { type: String, enum: SURFACE_KEYS, default: null },
@@ -285,6 +353,10 @@ const templateSchema = new mongoose.Schema(
         },
       ],
       default: () => ['front', 'back'],
+    },
+    previewScenes: {
+      type: [previewSceneSchema],
+      default: () => [],
     },
     surfaces: {
       front: { type: surfaceSchema, required: true },
@@ -365,6 +437,17 @@ templateSchema.pre('validate', function normalizeTemplateSurfaces(next) {
 
   if (!Array.isArray(this.supportedSurfaces) || this.supportedSurfaces.length === 0) {
     this.supportedSurfaces = existingSurfaceKeys;
+  }
+
+  if (!Array.isArray(this.previewScenes) || this.previewScenes.length === 0) {
+    this.previewScenes = existingSurfaceKeys.map((key, index) => ({
+      key,
+      label: key === 'neckLabelInner' ? 'Neck Label Inner' : key.charAt(0).toUpperCase() + key.slice(1),
+      sortOrder: index,
+      surfaceKeys: [key],
+      isDefault: index === 0,
+      isActive: true,
+    }));
   }
 
   if (typeof next === 'function') {

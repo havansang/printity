@@ -86,6 +86,10 @@ function clampOutputSize(value) {
     return Math.min(MAX_OUTPUT_SIZE, Math.max(1, Math.round(numericValue)));
 }
 
+export function resolveMockupPreviewSize(value) {
+    return clampOutputSize(value);
+}
+
 function resolveFileExtension({ format, mimeType }) {
     const normalizedFormat = normalizeFormat(format);
     if (normalizedFormat !== 'png') {
@@ -601,10 +605,11 @@ export function canUseMockupPreviewApi(templateDef) {
 
 export async function buildMockupPreviewPayload({
     templateDef,
-    surfaceDef,
+    surfaceDefs,
+    sceneDefs,
     surfacePrintAreas,
     snapshots,
-    liveCanvas,
+    liveCanvasBySurface,
     shirtColor,
     shirtColors,
     uploadedImages,
@@ -614,37 +619,52 @@ export async function buildMockupPreviewPayload({
         return null;
     }
 
-    const surfaceKey = surfaceDef?.key;
-    const printArea = surfacePrintAreas?.[surfaceKey] || surfaceDef?.printArea;
-    if (!surfaceKey || !printArea) {
+    const normalizedSurfaceDefs = Array.isArray(surfaceDefs) ? surfaceDefs : [];
+    if (normalizedSurfaceDefs.length === 0) {
         return null;
     }
+    const placeholders = [];
 
-    const images = liveCanvas
-        ? await serializeSurfaceLayersFromCanvas(liveCanvas, printArea, uploadedImages)
-        : await serializeSurfaceLayers(
-            snapshots?.[surfaceKey] || null,
-            surfaceDef,
-            printArea,
-            uploadedImages
-        );
+    for (const surfaceDef of normalizedSurfaceDefs) {
+        const surfaceKey = surfaceDef?.key;
+        const printArea = surfacePrintAreas?.[surfaceKey] || surfaceDef?.printArea;
+        if (!surfaceKey || !printArea) {
+            continue;
+        }
+
+        const liveCanvas = liveCanvasBySurface?.[surfaceKey] || null;
+        const images = liveCanvas
+            ? await serializeSurfaceLayersFromCanvas(liveCanvas, printArea, uploadedImages)
+            : await serializeSurfaceLayers(
+                snapshots?.[surfaceKey] || null,
+                surfaceDef,
+                printArea,
+                uploadedImages
+            );
+
+        placeholders.push({
+            dom_id: resolveSurfaceDomIds(surfaceKey, surfaceDef),
+            position: resolveSurfacePosition(surfaceKey, surfaceDef),
+            sequence: Number(surfaceDef?.sequence) || 0,
+            printable: surfaceDef?.printable !== false,
+            decoration_method: resolveDecorationMethod(surfaceDef),
+            images,
+        });
+    }
+
+    const requestedSceneKeys = (Array.isArray(sceneDefs) ? sceneDefs : [])
+        .map((sceneDef) => String(sceneDef?.key || '').trim())
+        .filter(Boolean);
 
     const payload = {
         templateId,
         colorKey: resolveSelectedColorKey(shirtColor, shirtColors) || undefined,
-        surfaceKey,
+        sceneKeys: requestedSceneKeys.length > 0 ? requestedSceneKeys : undefined,
         responseType: 'json',
         format: DEFAULT_OUTPUT_FORMAT,
         size: clampOutputSize(templateDef?.defaultRenderOptions?.size || DEFAULT_OUTPUT_SIZE),
         print: {
-            placeholders: [{
-                dom_id: resolveSurfaceDomIds(surfaceKey, surfaceDef),
-                position: resolveSurfacePosition(surfaceKey, surfaceDef),
-                sequence: Number(surfaceDef?.sequence) || 0,
-                printable: surfaceDef?.printable !== false,
-                decoration_method: resolveDecorationMethod(surfaceDef),
-                images,
-            }],
+            placeholders,
             print_on_side: false,
             mirror: false,
             canvas: false,
@@ -677,13 +697,34 @@ export async function buildMockupPreviewPayload({
     return payload;
 }
 
+export function createMockupPreviewRequest(basePayload, overrides = {}) {
+    if (!basePayload || typeof basePayload !== 'object') {
+        return null;
+    }
+
+    const requestedSceneKeys = Array.isArray(overrides.sceneKeys)
+        ? overrides.sceneKeys.map((sceneKey) => String(sceneKey || '').trim()).filter(Boolean)
+        : undefined;
+    const nextResponseType = String(overrides.responseType || basePayload.responseType || 'json').trim().toLowerCase();
+
+    return {
+        ...basePayload,
+        sceneKeys: requestedSceneKeys && requestedSceneKeys.length > 0
+            ? requestedSceneKeys
+            : basePayload.sceneKeys,
+        responseType: nextResponseType === 'binary' ? 'binary' : 'json',
+        size: clampOutputSize(overrides.size ?? basePayload.size ?? DEFAULT_OUTPUT_SIZE),
+        format: normalizeFormat(overrides.format || basePayload.format || DEFAULT_OUTPUT_FORMAT),
+    };
+}
+
 export function buildMockupFilename({
     templateDef,
-    surfaceKey,
+    sceneKey,
     format,
     mimeType,
 }) {
     const baseName = String(templateDef?.slug || templateDef?.productType || 'product').trim() || 'product';
     const extension = resolveFileExtension({ format, mimeType });
-    return `${baseName}-${surfaceKey}-mockup.${extension}`;
+    return `${baseName}-${sceneKey}-mockup.${extension}`;
 }
