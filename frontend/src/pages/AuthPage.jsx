@@ -36,8 +36,8 @@ function AuthSessionCard({ user, logout, centered = false }) {
             <h1>{user?.displayName || 'Signed in user'}</h1>
             <p>{user?.email}</p>
             <div className="auth-session-actions">
-                <button type="button" className="primary-action" onClick={() => navigate('/')}>
-                    Go to home
+                <button type="button" className="primary-action" onClick={() => navigate('/dashboard')}>
+                    Go to dashboard
                 </button>
                 <button type="button" className="secondary-action" onClick={() => navigate('/editor')}>
                     Open studio

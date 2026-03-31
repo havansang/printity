@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
-import { useEditor, SHIRT_COLORS } from './EditorContext';
+import { useEditor } from './EditorContext';
+
+const DEFAULT_SHAPE_COLOR_HEX = '#64634A';
 
 const ALIGN_TOOLS = [
     { key: 'left', label: 'Align Left', icon: <AlignHLeft /> },
@@ -15,7 +17,8 @@ export default function RightPanel() {
         layers, selectedLayerId, selectLayer, deleteLayer, reorderLayers,
         updateObjectTransform, alignObject,
         shirtColor, setShirtColor,
-        canvasRef, selectedObjectType,
+        shirtColors, shirtColorsLoading, shirtColorsError,
+        canvasRef,
     } = useEditor();
 
     const [rpTab, setRpTab] = useState('layers');
@@ -29,7 +32,6 @@ export default function RightPanel() {
     const didDrag = useRef(false);
 
     const visualLayers = [...layers].reverse();
-    const selectedLayer = layers.find((l) => l.id === selectedLayerId);
 
     const getObjProps = (id) => {
         const canvas = canvasRef?.current;
@@ -89,17 +91,23 @@ export default function RightPanel() {
             <section className="rp-section rp-colors" id="rp-colors">
                 <div className="rp-sec-hdr">Product Color</div>
                 <div className="color-swatch-grid">
-                    {SHIRT_COLORS.map((c) => (
+                    {shirtColors.map((c) => (
                         <button
-                            key={c.hex}
+                            key={c.key || c.hex}
                             className={`color-swatch${shirtColor === c.hex ? ' sel' : ''}`}
-                            id={`color-${c.name.replace(/\s/g, '-').toLowerCase()}`}
+                            id={`color-${(c.label || c.hex).replace(/\s/g, '-').toLowerCase()}`}
                             style={{ background: c.hex, border: c.hex === '#FFFFFF' ? '1px solid #ddd' : 'none' }}
-                            title={c.name}
+                            title={c.label}
                             onClick={() => setShirtColor(c.hex)}
                         />
                     ))}
                 </div>
+                {shirtColorsLoading && (
+                    <p className="rp-note">Loading available colors...</p>
+                )}
+                {shirtColorsError && (
+                    <p className="rp-note">{shirtColorsError}</p>
+                )}
             </section>
 
             {/* ── Tabs ─────────────────────────────────────── */}
@@ -197,7 +205,7 @@ export default function RightPanel() {
                                             <>
                                                 <PropRow label="Color">
                                                     <input type="color" className="prop-color" id={`prop-color-${layer.id}`}
-                                                        value={(props.fill ?? '#4169E1').startsWith('#') ? (props.fill) : '#4169E1'}
+                                                        value={(props.fill ?? DEFAULT_SHAPE_COLOR_HEX).startsWith('#') ? (props.fill) : DEFAULT_SHAPE_COLOR_HEX}
                                                         onChange={(e) => updateObjectTransform(layer.id, { fill: e.target.value })} />
                                                 </PropRow>
                                                 <PropRow label="Width">

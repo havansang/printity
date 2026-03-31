@@ -1,6 +1,21 @@
 import { navigate } from '../../app/router';
 import { formatDateTime, formatProductType } from '../../shared/lib/formatters';
 
+function buildEditorUrl(templateId, projectId) {
+    const params = new URLSearchParams();
+
+    if (projectId) {
+        params.set('projectId', projectId);
+    }
+
+    if (templateId) {
+        params.set('templateId', templateId);
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/editor?${queryString}` : '/editor';
+}
+
 export default function ProjectsPanel({
     isAuthenticated,
     isInitializing,
@@ -88,7 +103,7 @@ export default function ProjectsPanel({
                                     <button
                                         type="button"
                                         className="ghost-action ghost-action-inline"
-                                        onClick={() => navigate('/editor')}
+                                        onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
                                     >
                                         Resume in studio
                                     </button>

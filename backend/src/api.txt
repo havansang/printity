@@ -622,12 +622,186 @@ Output:
   "data": {}
 }
 
-6. GHI CHU DE FRONTEND GOI API
+6. FONT APIs
+
+GET /api/v1/fonts
+Auth: khong can
+Input:
+- query.search: tim theo family name, tuy chon
+- query.includeVariants: true | false, mac dinh true
+
+Output:
+{
+  "success": true,
+  "message": "Fonts fetched successfully",
+  "data": {
+    "items": [
+      {
+        "family": "Aboreto",
+        "category": "display",
+        "coverage": {
+          "latin": "..."
+        },
+        "attributes": [],
+        "source": "catalog",
+        "variantCount": 1,
+        "variants": [
+          {
+            "fontVariant": "regular",
+            "fontWeight": 400,
+            "fontStyle": "normal",
+            "label": "Regular",
+            "attributes": [],
+            "relativePath": "families/aboreto/regular.ttf",
+            "remoteUrl": "https://..."
+          }
+        ]
+      }
+    ],
+    "total": 1,
+    "fallbackFamilies": ["Arial", "sans-serif", "serif", "monospace", "Times New Roman", "Courier New"],
+    "generatedAt": "ISODate",
+    "source": "C:\\Users\\...\\fonts.json"
+  }
+}
+
+GET /api/v1/fonts/:family
+Auth: khong can
+Input:
+- params.family: family name cua font, bat buoc
+- query.includeVariants: true | false, mac dinh true
+
+Output:
+{
+  "success": true,
+  "message": "Font fetched successfully",
+  "data": {
+    "font": {
+      "family": "Aboreto",
+      "category": "display",
+      "coverage": {
+        "latin": "..."
+      },
+      "attributes": [],
+      "source": "catalog",
+      "variantCount": 1,
+      "variants": [
+        {
+          "fontVariant": "regular",
+          "fontWeight": 400,
+          "fontStyle": "normal",
+          "label": "Regular",
+          "attributes": [],
+          "relativePath": "families/aboreto/regular.ttf",
+          "remoteUrl": "https://..."
+        }
+      ]
+    },
+    "fallbackFamilies": ["Arial", "sans-serif", "serif", "monospace", "Times New Roman", "Courier New"],
+    "generatedAt": "ISODate",
+    "source": "C:\\Users\\...\\fonts.json"
+  }
+}
+
+7. MOCKUP APIs
+
+POST /api/v1/mockups/preview
+Auth: Bearer token
+Input:
+- header.Authorization: Bearer <jwt>
+- body.templateId: Mongo ObjectId cua template, bat buoc
+- body.print.placeholders: mang placeholder tu client, bat buoc
+- body.surfaceKey: "front" | "back" | "neckLabelInner", tuy chon
+- body.responseType: "json" | "binary", mac dinh "json"
+- body.format: "png" | "jpeg" | "jpg" | "webp", tuy chon
+- body.size: so nguyen duong <= 4096, la max dimension cua anh preview, tuy chon
+- body.colorKey: color key on dinh cua ao, vi du "white", "black", "heather-navy", tuy chon
+- body.shirtColor: field cu de tuong thich nguoc, backend se co gang map sang colorKey
+- body.debug: true | false, mac dinh false, chi dung voi responseType = "json"
+- body.debugStages: ["base", "design", "masked", "warped", "shadowed", "final"], tuy chon
+- body co the gui them cac field kieu Printify nhu decorator_id, camera_id, variant_id..., backend se bo qua neu khong can
+
+Output khi responseType = "json":
+{
+  "success": true,
+  "message": "Mockup preview rendered successfully",
+  "data": {
+    "templateId": "string",
+    "colorKey": "black",
+    "format": "png",
+    "previews": [
+      {
+        "surfaceKey": "front",
+        "position": "front",
+        "mimeType": "image/png",
+        "width": 900,
+        "height": 900,
+        "dataUrl": "data:image/png;base64,...",
+        "debug": {
+          "stages": {
+            "base": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "design": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "masked": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "warped": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "shadowed": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            },
+            "final": {
+              "mimeType": "image/png",
+              "width": 900,
+              "height": 900,
+              "dataUrl": "data:image/png;base64,..."
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+
+Output khi responseType = "binary":
+- response content-type la image/png, image/jpeg hoac image/webp
+- body la binary image buffer
+- khi dung binary thi bat buoc phai co body.surfaceKey
+
+Ghi chu:
+- API hien tai render duoc layerType image, shape, text
+- API map placeholder sang surface theo dom_id hoac position
+- Neu co colorKey thi backend se resolve base.png theo mockup pack manifest; neu chua co asset cua mau do thi fallback ve mau mac dinh
+- Preview duoc build server-side theo pipeline: place -> mask -> displacement -> blend -> composite
+- Debug mode xuat rieng tung stage de kiem tra asset, chi ho tro voi responseType = "json"
+
+8. GHI CHU DE FRONTEND GOI API
 - Tat ca API can auth deu dung header Authorization: Bearer <jwt>
 - Login/Register/Forgot-password request OTP deu can turnstileToken hop le
 - Project API chap nhan ca payload moi: surfaces.front/back.canvasJson
 - Project API cung chap nhan payload cu: frontCanvasJson va backCanvasJson
+- Project API va Mockup API chap nhan surface "neckLabelInner"
 - Upload asset dung multipart/form-data, field ten la file
 - URL file upload tra ve dang /uploads/...
+- Mockup assets he thong duoc serve qua /mockups/...
 - Forgot password request OTP luon tra ve message chung de tranh email enumeration
 - OTP reset password hien tai la ma 6 so, het han sau 5 phut, khoa sau 5 lan nhap sai

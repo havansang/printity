@@ -1,0 +1,218 @@
+[
+  {
+    "name": "Star",
+    "slug": "star",
+    "group": "basic",
+    "tags": ["star"],
+    "geometry": {
+      "pathCommands": "M28 0L35.3638 18.8646L55.5806 20.0385L39.9148 32.8714L45.0458 52.4615L28 41.528L10.9542 52.4615L16.0852 32.8714L0.419361 20.0385L20.6362 18.8646L28 0Z",
+      "defaultWidth": 160,
+      "defaultHeight": 152.1692
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f9583eba021c963bf42804",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f9583eba021c963bf42804"
+    },
+    "isActive": true,
+    "sortOrder": 1
+  },
+  {
+    "name": "Heart",
+    "slug": "heart",
+    "group": "basic",
+    "tags": ["heart", "love"],
+    "geometry": {
+      "pathCommands": "M23 42L19.665 39.0245C15.7933 35.5531 12.5925 32.5586 10.0625 30.0409C7.5325 27.5232 5.52 25.2629 4.025 23.2602C2.53 21.2575 1.48542 19.4169 0.89125 17.7384C0.297083 16.0599 0 14.3433 0 12.5886C0 9.00272 1.2075 6.00817 3.6225 3.6049C6.0375 1.20163 9.04667 0 12.65 0C14.6433 0 16.5408 0.419619 18.3425 1.25886C20.1442 2.09809 21.6967 3.28065 23 4.80654C24.3033 3.28065 25.8558 2.09809 27.6575 1.25886C29.4592 0.419619 31.3567 0 33.35 0C36.9533 0 39.9625 1.20163 42.3775 3.6049C44.7925 6.00817 46 9.00272 46 12.5886C46 14.3433 45.7029 16.0599 45.1088 17.7384C44.5146 19.4169 43.47 21.2575 41.975 23.2602C40.48 25.2629 38.4675 27.5232 35.9375 30.0409C33.4075 32.5586 30.2067 35.5531 26.335 39.0245L23 42Z",
+      "defaultWidth": 160,
+      "defaultHeight": 146.087
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f958bbe58553a3bb009867",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f958bbe58553a3bb009867"
+    },
+    "isActive": true,
+    "sortOrder": 2
+  },
+  {
+    "name": "Underline",
+    "slug": "underline",
+    "group": "line",
+    "tags": ["underline", "line", "divider"],
+    "geometry": {
+      "pathCommands": "M0 4.5V0H64V4.5H0Z",
+      "defaultWidth": 160,
+      "defaultHeight": 11.25
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f958da68c24c5334a097a6",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f958da68c24c5334a097a6"
+    },
+    "isActive": true,
+    "sortOrder": 3
+  },
+  {
+    "name": "Triangle",
+    "slug": "triangle",
+    "group": "basic",
+    "tags": ["triangle", "polygon"],
+    "geometry": {
+      "pathCommands": "M26.5 0L52.0477 44.25H0.952251L26.5 0Z",
+      "defaultWidth": 160,
+      "defaultHeight": 138.5642
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f958e666d6e9e63cc6edee",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f958e666d6e9e63cc6edee"
+    },
+    "isActive": true,
+    "sortOrder": 4
+  },
+  {
+    "name": "Circle",
+    "slug": "circle",
+    "group": "basic",
+    "tags": ["circle", "ellipse"],
+    "geometry": {
+      "pathCommands": "M46 23C46 35.7025 35.7025 46 23 46C10.2975 46 0 35.7025 0 23C0 10.2975 10.2975 0 23 0C35.7025 0 46 10.2975 46 23Z",
+      "defaultWidth": 160,
+      "defaultHeight": 160
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f958ef1bed9277293ed6f6",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f958ef1bed9277293ed6f6"
+    },
+    "isActive": true,
+    "sortOrder": 5
+  },
+  {
+    "name": "Square",
+    "slug": "square",
+    "group": "basic",
+    "tags": ["square", "rectangle"],
+    "geometry": {
+      "pathCommands": "M0 42V0H42V42H0Z",
+      "defaultWidth": 160,
+      "defaultHeight": 160
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f958f9fe82631240d8b15e",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f958f9fe82631240d8b15e"
+    },
+    "isActive": true,
+    "sortOrder": 6
+  },
+  {
+    "name": "Burst",
+    "slug": "burst",
+    "group": "decorative",
+    "tags": ["burst", "starburst", "sparkle"],
+    "geometry": {
+      "pathCommands": "M27 0L30.7379 16.496L43.458 5.34752L36.7859 20.8902L53.6296 19.3475L39.096 28L53.6296 36.6525L36.7859 35.1099L43.458 50.6525L30.7379 39.504L27 56L23.2621 39.504L10.542 50.6525L17.2141 35.1099L0.370417 36.6525L14.904 28L0.370417 19.3475L17.2141 20.8902L10.542 5.34752L23.2621 16.496L27 0Z",
+      "defaultWidth": 152.1691,
+      "defaultHeight": 160
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f9590461fd2be86ad87f1d",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f9590461fd2be86ad87f1d"
+    },
+    "isActive": true,
+    "sortOrder": 7
+  },
+  {
+    "name": "Sparkle",
+    "slug": "sparkle",
+    "group": "decorative",
+    "tags": ["sparkle", "burst", "diamond"],
+    "geometry": {
+      "pathCommands": "M26.5909 0L31.3094 22.1748C32.5657 28.0787 36.9701 32.8116 42.7687 34.4885L53.1818 37.5L42.7687 40.5115C36.9701 42.1884 32.5657 46.9213 31.3094 52.8252L26.5909 75L21.8724 52.8252C20.6161 46.9213 16.2117 42.1884 10.4132 40.5115L0 37.5L10.4131 34.4885C16.2117 32.8116 20.6161 28.0787 21.8724 22.1748L26.5909 0Z",
+      "defaultWidth": 113.4545,
+      "defaultHeight": 160
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f9590dd4d010ab56b3fc8c",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f9590dd4d010ab56b3fc8c"
+    },
+    "isActive": true,
+    "sortOrder": 8
+  },
+  {
+    "name": "Arch",
+    "slug": "arch",
+    "group": "basic",
+    "tags": ["arch", "half-circle", "semi-circle"],
+    "geometry": {
+      "pathCommands": "M56 28C37.1304 28 20.087 28 0 28C0 12.536 12.536 0 28 0C43.464 0 56 12.536 56 28Z",
+      "defaultWidth": 160,
+      "defaultHeight": 80
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f9591bfe82631240d8b163",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f9591bfe82631240d8b163"
+    },
+    "isActive": true,
+    "sortOrder": 9
+  },
+  {
+    "name": "Arc",
+    "slug": "arc",
+    "group": "decorative",
+    "tags": ["arc", "outline", "rainbow"],
+    "geometry": {
+      "pathCommands": "M46 28L56 28C56 12.536 43.464 0 28 0C12.536 0 0 12.536 0 28L10 28C10 18.0589 18.0589 10 28 10C37.9411 10 46 18.0589 46 28Z",
+      "defaultWidth": 160,
+      "defaultHeight": 80
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f959251bed9277293ed6fd",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f959251bed9277293ed6fd"
+    },
+    "isActive": true,
+    "sortOrder": 10
+  },
+  {
+    "name": "Badge",
+    "slug": "badge",
+    "group": "decorative",
+    "tags": ["badge", "emblem", "cross"],
+    "geometry": {
+      "pathCommands": "M7.83478 18.6652L0 26.5L7.83478 34.3348V45.1652H18.6652L26.5 53L34.3348 45.1652H45.1652V34.3348L53 26.5L45.1652 18.6652V7.83478H34.3348L26.5 0L18.6652 7.83478H7.83478V18.6652Z",
+      "defaultWidth": 160,
+      "defaultHeight": 160
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f95931b5cf139438024ebd",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f95931b5cf139438024ebd"
+    },
+    "isActive": true,
+    "sortOrder": 11
+  },
+  {
+    "name": "Hexagon",
+    "slug": "hexagon",
+    "group": "decorative",
+    "tags": ["hexagon", "gem", "chevron"],
+    "geometry": {
+      "pathCommands": "M27.86 24.0688H0L13.86 48H42L56 24.0688L42 0L27.86 24.0688Z",
+      "defaultWidth": 160,
+      "defaultHeight": 137.1429
+    },
+    "previewUrl": "https://images.printify.com/api/template-library/mockup/67f9593cf04ba4cba47cc3b7",
+    "source": {
+      "provider": "printify",
+      "externalId": "67f9593cf04ba4cba47cc3b7"
+    },
+    "isActive": true,
+    "sortOrder": 12
+  }
+]

@@ -68,41 +68,114 @@ Indexes:
 3. COLLECTION: templates
 Model: Template
 Muc dich:
-- Luu product template de frontend render editor
-- Moi template thuoc 1 productType va co du 2 mat front/back
+- Luu product template cho ca editor SVG va render mockup PNG
+- Dinh nghia mapping tu editor space sang render space cho tung surface
 
 Fields:
 - name: String, required, trim
 - slug: String, required, unique, trim
 - productType: String, required, enum ["tshirt", "polo"]
 - description: String, default null
+- version: Number, default 1
+- mockupPack: Object, default {}
+- mockupPack.slug: String, default null
+- mockupPack.manifestPath: String, default null
+- mockupPack.defaultColorKey: String, default "white"
+- providerRefs: Object, default {}
+- providerRefs.blueprintId: Number, default null
+- providerRefs.defaultCameraId: Number, default null
+- providerRefs.defaultDecoratorId: Number, default null
+- supportedSurfaces: [String], enum ["front", "back", "neckLabelInner"], default ["front", "back"]
+- availableColors: [Object], default []
+- availableColors[].key: String, required
+- availableColors[].label: String, required
+- availableColors[].hex: String, required
+- availableColors[].rgb: String, default null
+- availableColors[].imageUrl: String, default null
+- availableColors[].sortOrder: Number, default 0
+- availableColors[].isLight: Boolean, default false
+- availableColors[].isActive: Boolean, default true
+- availableColors[].providerVariantIds: [Number], default []
 - surfaces.front: Object, required
-- surfaces.front.label: String, required
-- surfaces.front.templateImageUrl: String, required
-- surfaces.front.overlayImageUrl: String, default null
-- surfaces.front.maskImageUrl: String, default null
-- surfaces.front.printArea.x: Number, required
-- surfaces.front.printArea.y: Number, required
-- surfaces.front.printArea.width: Number, required
-- surfaces.front.printArea.height: Number, required
 - surfaces.back: Object, required
-- surfaces.back.label: String, required
-- surfaces.back.templateImageUrl: String, required
-- surfaces.back.overlayImageUrl: String, default null
-- surfaces.back.maskImageUrl: String, default null
-- surfaces.back.printArea.x: Number, required
-- surfaces.back.printArea.y: Number, required
-- surfaces.back.printArea.width: Number, required
-- surfaces.back.printArea.height: Number, required
+- surfaces.neckLabelInner: Object, default null
+- surfaces.<surfaceKey>.key: String, enum ["front", "back", "neckLabelInner"]
+- surfaces.<surfaceKey>.label: String, required
+- surfaces.<surfaceKey>.position: String, default null
+- surfaces.<surfaceKey>.domId: [String], default []
+- surfaces.<surfaceKey>.sequence: Number, default 0
+- surfaces.<surfaceKey>.printable: Boolean, default true
+- surfaces.<surfaceKey>.allowedDecorationMethods: [String], default []
+- surfaces.<surfaceKey>.templateImageUrl: String, required
+- surfaces.<surfaceKey>.overlayImageUrl: String, default null
+- surfaces.<surfaceKey>.maskImageUrl: String, default null
+- surfaces.<surfaceKey>.printArea: Object, required
+- surfaces.<surfaceKey>.printArea.x: Number, required
+- surfaces.<surfaceKey>.printArea.y: Number, required
+- surfaces.<surfaceKey>.printArea.width: Number, required
+- surfaces.<surfaceKey>.printArea.height: Number, required
+- surfaces.<surfaceKey>.printArea.safeZone: Object, default null
+- surfaces.<surfaceKey>.printArea.bleed: Object, default null
+- surfaces.<surfaceKey>.printArea.anchor: Object, default null
+- surfaces.<surfaceKey>.printArea.cornerRadius: Number, default null
+- surfaces.<surfaceKey>.printArea.unit: String, default "scene"
+- surfaces.<surfaceKey>.printArea.origin: String, enum ["top-left", "center"], default "top-left"
+- surfaces.<surfaceKey>.editor: Object, default null
+- surfaces.<surfaceKey>.editor.sourceType: String, default "svg"
+- surfaces.<surfaceKey>.editor.svgUrl: String, default null
+- surfaces.<surfaceKey>.editor.sceneWidth: Number, default null
+- surfaces.<surfaceKey>.editor.sceneHeight: Number, default null
+- surfaces.<surfaceKey>.editor.placeholderId: String, default null
+- surfaces.<surfaceKey>.editor.printArea: Object, default null
+- surfaces.<surfaceKey>.transformPolicy: Object, default {}
+- surfaces.<surfaceKey>.transformPolicy.positionUnit: String, default "normalized"
+- surfaces.<surfaceKey>.transformPolicy.sizeUnit: String, default "normalized"
+- surfaces.<surfaceKey>.transformPolicy.origin: String, enum ["center", "top-left"], default "center"
+- surfaces.<surfaceKey>.transformPolicy.rotationUnit: String, default "deg"
+- surfaces.<surfaceKey>.transformPolicy.flipSupported: Boolean, default true
+- surfaces.<surfaceKey>.transformPolicy.fitMode: String, enum ["contain", "cover", "stretch"], default "contain"
+- surfaces.<surfaceKey>.transformPolicy.requireSimilarAspectRatio: Boolean, default true
+- surfaces.<surfaceKey>.transformPolicy.maxAspectRatioDelta: Number, default 0.01
+- surfaces.<surfaceKey>.render: Object, default {}
+- surfaces.<surfaceKey>.render.outputWidth: Number, default null
+- surfaces.<surfaceKey>.render.outputHeight: Number, default null
+- surfaces.<surfaceKey>.render.baseImageUrl: String, default null
+- surfaces.<surfaceKey>.render.printArea: Object, default null
+- surfaces.<surfaceKey>.render.printQuad: Object, default null
+- surfaces.<surfaceKey>.render.assets.maskImageUrl: String, default null
+- surfaces.<surfaceKey>.render.assets.shadowImageUrl: String, default null
+- surfaces.<surfaceKey>.render.assets.highlightImageUrl: String, default null
+- surfaces.<surfaceKey>.render.assets.displacementImageUrl: String, default null
+- surfaces.<surfaceKey>.render.assets.grainImageUrl: String, default null
+- surfaces.<surfaceKey>.render.assets.occlusionImageUrl: String, default null
+- surfaces.<surfaceKey>.render.blendModes.shadow: String, default "multiply"
+- surfaces.<surfaceKey>.render.blendModes.highlight: String, default "screen"
+- surfaces.<surfaceKey>.render.blendModes.grain: String, default "soft-light"
+- surfaces.<surfaceKey>.render.displacement.neutral: Number, default 128
+- surfaces.<surfaceKey>.render.displacement.scaleX: Number, default 0
+- surfaces.<surfaceKey>.render.displacement.scaleY: Number, default 0
+- surfaces.<surfaceKey>.render.displacement.blur: Number, default 0
 - thumbnailUrl: String, default null
 - isActive: Boolean, default true
 - sortOrder: Number, default 0
+- defaultRenderOptions: Object, default {}
+- defaultRenderOptions.size: Number, default 2048
+- defaultRenderOptions.format: String, default "jpeg"
+- defaultRenderOptions.mockupMode: String, default "RGB"
 - createdAt: Date, auto by timestamps
 - updatedAt: Date, auto by timestamps
 
 Business rules:
 - Moi template bat buoc co surfaces.front va surfaces.back
-- Moi surface bat buoc co templateImageUrl va printArea
+- neckLabelInner la surface tuy chon, dung cho nhan co trong hoac cac vi tri phu
+- mockupPack.manifestPath tro toi file manifest asset tren filesystem, dung de resolve base.png theo colorKey
+- availableColors la danh sach mau frontend duoc phep hien thi/chon cho template
+- templateImageUrl va printArea la data toi thieu de frontend editor co the hien thi surface
+- editor.printArea la vung in trong he toa do SVG editor
+- render.printArea la vung dat design trong he toa do anh mockup PNG
+- Neu dung rect-based mapping thi editor.printArea va render.printArea nen dong dang hoac rat gan dong dang
+- transformPolicy quy dinh cach backend hieu x/y/scale/rotation ma client gui len
+- supportedSurfaces duoc suy ra tu cac surface thuc su ton tai neu khong truyen tay
 
 Indexes:
 - unique index: slug
@@ -111,30 +184,64 @@ Indexes:
 Model: Project
 Muc dich:
 - Luu editor state cua 1 thiet ke cua user
-- Data canvas luu dang Fabric JSON
+- Luu raw payload client gui len va payload da normalize de backend render preview
 
 Fields:
 - userId: ObjectId, required, ref User
 - name: String, required, trim
 - templateId: ObjectId, required, ref Template
 - productType: String, required, enum ["tshirt", "polo"]
+- selection: Object, default null
+- selection.colorKey: String, default null
+- selection.colorLabel: String, default null
+- selection.colorHex: String, default null
+- selection.variantId: Number, default null
+- selection.cameraId: Number, default null
+- selection.blueprintId: Number, default null
+- selection.decoratorId: Number, default null
+- renderOptions: Object, default null
+- renderOptions.size: Number, default null
+- renderOptions.format: String, default null
+- renderOptions.mockupMode: String, default null
+- renderOptions.mirror: Boolean, default false
+- renderOptions.printOnSide: Boolean, default false
+- renderOptions.canvas: Boolean, default false
+- renderOptions.fontColor: String, default null
+- renderOptions.country: String, default null
+- renderOptions.newEmbroideryColorPalette: Boolean, default false
+- printPayloadRaw: Mixed, default null
+- printPayloadNormalized: Mixed, default null
 - surfaces.front: Object
-- surfaces.front.canvasJson: Mixed, default null
-- surfaces.front.previewImageUrl: String, default null
 - surfaces.back: Object
-- surfaces.back.canvasJson: Mixed, default null
-- surfaces.back.previewImageUrl: String, default null
+- surfaces.neckLabelInner: Object
+- surfaces.<surfaceKey>.canvasJson: Mixed, default null
+- surfaces.<surfaceKey>.previewImageUrl: String, default null
+- surfaces.<surfaceKey>.designCompositeUrl: String, default null
+- surfaces.<surfaceKey>.designCompositeWidth: Number, default null
+- surfaces.<surfaceKey>.designCompositeHeight: Number, default null
+- surfaces.<surfaceKey>.renderStatus: String, enum ["idle", "queued", "processing", "ready", "failed"], default "idle"
+- surfaces.<surfaceKey>.renderHash: String, default null
 - thumbnailUrl: String, default null
 - status: String, enum ["draft", "completed"], default "draft"
 - lastOpenedAt: Date, default Date.now
+- lastRenderedAt: Date, default null
 - createdAt: Date, auto by timestamps
 - updatedAt: Date, auto by timestamps
 
 Business rules:
 - userId duoc lay tu JWT, khong lay tu client body
 - productType la du lieu denormalized tu Template
-- Front/back surface luon co structure on dinh
-- Backend chap nhan payload cu frontCanvasJson/backCanvasJson va map vao surfaces.front/back.canvasJson
+- selection luu variant/camera/decorator ma user dang chon
+- selection.colorKey la khoa on dinh de backend resolve mockup mau ao
+- renderOptions luu options render nhu size, format, mockupMode, mirror
+- printPayloadRaw luu JSON goc client gui len, phuc vu debug, replay va doi soat
+- printPayloadNormalized luu payload da normalize theo rule noi bo cua backend renderer
+- surfaces.<surfaceKey>.canvasJson duoc dung de mo lai editor
+- surfaces.<surfaceKey>.designCompositeUrl luu anh design trung gian neu backend can cache render nhanh
+- surfaces.<surfaceKey>.previewImageUrl luu anh preview da render xong
+- surfaces.<surfaceKey>.renderStatus theo doi tien trinh render preview
+- Front/back/neckLabelInner surface luon co structure on dinh trong DB
+- Backend van chap nhan payload cu frontCanvasJson/backCanvasJson va map vao surfaces.front/back.canvasJson
 
 Indexes:
 - { userId: 1, updatedAt: -1 }
@@ -178,5 +285,6 @@ Indexes:
 7. ENUMS DANG DUNG
 - authProviders: ["local", "google"]
 - productType: ["tshirt", "polo"]
-- surfaces: ["front", "back"]
+- surfaces: ["front", "back", "neckLabelInner"]
 - project.status: ["draft", "completed"]
+- project.surfaces.renderStatus: ["idle", "queued", "processing", "ready", "failed"]

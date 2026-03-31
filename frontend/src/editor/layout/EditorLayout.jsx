@@ -8,9 +8,9 @@ import BottomToolbar from './BottomToolbar';
 import PreviewWorkspace from './PreviewWorkspace';
 import './editor.css';
 
-export default function EditorLayout() {
+export default function EditorLayout({ templateDef, initialProject = null }) {
     return (
-        <EditorProvider>
+        <EditorProvider templateDef={templateDef} initialProject={initialProject}>
             <EditorShell />
         </EditorProvider>
     );
@@ -22,18 +22,23 @@ function EditorShell() {
     return (
         <div className="editor-shell">
             <TopBar />
-            {isPreviewMode ? (
+            <div
+                className={`editor-mode-shell${isPreviewMode ? ' is-hidden' : ' is-active'}`}
+                aria-hidden={isPreviewMode}
+            >
+                <div className="editor-body">
+                    <LeftToolbar />
+                    <CanvasWorkspace />
+                    <RightPanel />
+                </div>
+                <BottomToolbar />
+            </div>
+            <div
+                className={`editor-mode-shell${isPreviewMode ? ' is-active' : ' is-hidden'}`}
+                aria-hidden={!isPreviewMode}
+            >
                 <PreviewWorkspace />
-            ) : (
-                <>
-                    <div className="editor-body">
-                        <LeftToolbar />
-                        <CanvasWorkspace />
-                        <RightPanel />
-                    </div>
-                    <BottomToolbar />
-                </>
-            )}
+            </div>
         </div>
     );
 }

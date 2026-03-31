@@ -1,10 +1,11 @@
+import { resolveRenderableAssetUrl } from '../../shared/lib/assetUrls';
 import { formatProductType } from '../../shared/lib/formatters';
 
 function getTemplatePreview(template) {
-    if (template?.thumbnailUrl) return template.thumbnailUrl;
+    if (template?.thumbnailUrl) return resolveRenderableAssetUrl(template.thumbnailUrl);
 
     const firstSurface = Object.values(template?.surfaces || {})[0];
-    return firstSurface?.templateImageUrl || '/front.svg';
+    return resolveRenderableAssetUrl(firstSurface?.templateImageUrl) || '/front.svg';
 }
 
 export default function TemplateGrid({

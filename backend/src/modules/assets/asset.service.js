@@ -63,19 +63,19 @@ async function uploadAsset(userId, file) {
 }
 
 async function listAssets(userId) {
-  const assets = await Asset.find({ userId }).sort({ createdAt: -1 });
+  const assets = await Asset.find({ userId, deletedAt: null }).sort({ createdAt: -1 });
   return assets.map(mapAsset);
 }
 
 async function deleteAsset(userId, assetId) {
-  const asset = await Asset.findOne({ _id: assetId, userId });
+  const asset = await Asset.findOne({ _id: assetId, userId, deletedAt: null });
 
   if (!asset) {
     throw new ApiError(404, 'Asset not found');
   }
 
-  await deletePhysicalFile(asset.path);
-  await asset.deleteOne();
+  asset.deletedAt = new Date();
+  await asset.save();
 }
 
 module.exports = {

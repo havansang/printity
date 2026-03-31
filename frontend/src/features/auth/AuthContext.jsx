@@ -13,6 +13,8 @@ import {
     logout as logoutRequest,
     register as registerRequest,
 } from './authApi';
+import { navigate } from '../../app/router';
+import { subscribeToAuthSessionExpired } from './authSessionEvents';
 
 const AUTH_STORAGE_KEY = 'printity.auth.session';
 const AuthContext = createContext(null);
@@ -90,6 +92,11 @@ export function AuthProvider({ children }) {
             isCancelled = true;
         };
     }, [clearSession, refreshCurrentUser, session.token]);
+
+    useEffect(() => subscribeToAuthSessionExpired(() => {
+        clearSession();
+        navigate('/auth?mode=login', { replace: true });
+    }), [clearSession]);
 
     const login = useCallback(async (credentials) => {
         const payload = await loginRequest(credentials);
