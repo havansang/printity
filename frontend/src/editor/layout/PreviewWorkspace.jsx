@@ -345,6 +345,7 @@ export default function PreviewWorkspace() {
 
         async function buildPreviews() {
             setIsLoading(true);
+            setLoadingFullScene('');
             setErrorMessage('');
             setSaveMessage('');
 
@@ -395,6 +396,13 @@ export default function PreviewWorkspace() {
                         return;
                     }
 
+                    previewItemsBySceneRef.current = {};
+                    setPreviewItemsByScene({});
+                    setSelectedScene((current) => (
+                        orderedSceneDefs.some((scene) => scene.key === current)
+                            ? current
+                            : nextInitialSceneKey
+                    ));
                     previewBuildSignatureRef.current = nextBuildSignature;
                     const thumbnailPayload = createMockupPreviewRequest(basePayload, {
                         size: THUMBNAIL_PREVIEW_SIZE,
@@ -435,6 +443,13 @@ export default function PreviewWorkspace() {
                     return;
                 }
 
+                previewItemsBySceneRef.current = {};
+                setPreviewItemsByScene({});
+                setSelectedScene((current) => (
+                    orderedSceneDefs.some((scene) => scene.key === current)
+                        ? current
+                        : nextInitialSceneKey
+                ));
                 previewBuildSignatureRef.current = nextBuildSignature;
 
                 const fallback = await buildClientPreviewItems({
@@ -573,12 +588,22 @@ export default function PreviewWorkspace() {
         () => previewItemsByScene[selectedScene] || previewItems[0] || null,
         [previewItems, previewItemsByScene, selectedScene]
     );
-    const selectedItemPreviewUrl = selectedItem ? getPreviewDisplayUrl(selectedItem) : '';
-    const isSelectedSceneLoadingFullPreview = Boolean(
+    const selectedItemFullPreviewUrl = selectedItem?.fullPreviewUrl || '';
+    const isSelectedSceneAwaitingFullPreview = Boolean(
         selectedItem
         && selectedItem.source === 'server'
         && !selectedItem.fullPreviewUrl
-        && loadingFullScene === selectedItem.scene
+    );
+    const isSelectedSceneLoadingFullPreview = Boolean(
+        isSelectedSceneAwaitingFullPreview
+        && loadingFullScene === selectedItem?.scene
+    );
+    const shouldShowSelectedImage = Boolean(
+        selectedItem
+        && (
+            selectedItem.source !== 'server'
+            || selectedItem.fullPreviewUrl
+        )
     );
 
     const handleDownload = async (item) => {
@@ -627,18 +652,18 @@ export default function PreviewWorkspace() {
         <section className="preview-shell" id="preview-workspace">
             <div className="preview-viewer">
                 <div className="preview-stage">
-                    {!selectedItem && isLoading && (
+                    {isLoading && !selectedItem && (
                         <div className="preview-placeholder">
                             <Spinner />
                             <span>Rendering mockup...</span>
                         </div>
                     )}
 
-                    {selectedItem && (
+                    {shouldShowSelectedImage && (
                         <>
                             <img
                                 className="preview-stage-image"
-                                src={selectedItemPreviewUrl}
+                                src={selectedItem.source === 'server' ? selectedItemFullPreviewUrl : getPreviewDisplayUrl(selectedItem)}
                                 alt={selectedItem.label}
                             />
                             {isSelectedSceneLoadingFullPreview && (
@@ -648,6 +673,17 @@ export default function PreviewWorkspace() {
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {selectedItem && !shouldShowSelectedImage && (
+                        <div className="preview-placeholder">
+                            <Spinner />
+                            <span>
+                                {isSelectedSceneAwaitingFullPreview
+                                    ? 'Loading full-resolution preview...'
+                                    : 'Rendering mockup...'}
+                            </span>
+                        </div>
                     )}
 
                     {!isLoading && !selectedItem && (

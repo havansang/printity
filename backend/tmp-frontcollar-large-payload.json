@@ -1,0 +1,36 @@
+{
+  "templateId": "69c90217d198d7d50cf31a0e",
+  "colorKey": "gold",
+  "sceneKeys": ["frontCollarCloseup"],
+  "responseType": "json",
+  "format": "png",
+  "size": 2048,
+  "print": {
+    "placeholders": [
+      {
+        "dom_id": ["#placeholder_necktag"],
+        "position": "neck",
+        "sequence": 0,
+        "printable": true,
+        "decoration_method": "dtg",
+        "images": [
+          {
+            "id": "shape-1",
+            "x": 0.4869,
+            "y": 0.4869,
+            "angle": 0,
+            "scale": 1,
+            "flipX": false,
+            "flipY": false,
+            "layerType": "shape",
+            "width": 301.669,
+            "height": 301.669,
+            "fill": { "type": "solid", "color": "#64634A" },
+            "stroke": null,
+            "pathCommands": "M 0 301.669 L 0 0 L 301.669 0 L 301.669 301.669 L 0 301.669 Z"
+          }
+        ]
+      }
+    ]
+  }
+}

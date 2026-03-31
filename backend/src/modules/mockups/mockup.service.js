@@ -378,6 +378,70 @@ function bufferToDataUrl(buffer, mimeType) {
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
+function parseHexColor(hex) {
+  const normalizedHex = normalizeHex(hex);
+  if (!normalizedHex) {
+    return null;
+  }
+
+  const compactHex = normalizedHex.slice(1);
+  const expandedHex = compactHex.length === 3
+    ? compactHex
+      .split('')
+      .map((channel) => `${channel}${channel}`)
+      .join('')
+    : compactHex;
+
+  if (!/^[0-9A-F]{6}$/i.test(expandedHex)) {
+    return null;
+  }
+
+  return {
+    r: Number.parseInt(expandedHex.slice(0, 2), 16),
+    g: Number.parseInt(expandedHex.slice(2, 4), 16),
+    b: Number.parseInt(expandedHex.slice(4, 6), 16),
+  };
+}
+
+async function tintMonochromeBuffer(buffer, colorHex) {
+  if (!buffer || !colorHex) {
+    return buffer;
+  }
+
+  const tintColor = parseHexColor(colorHex);
+  if (!tintColor) {
+    return buffer;
+  }
+
+  const { data, info } = await sharp(buffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  for (let pixelIndex = 0; pixelIndex < info.width * info.height; pixelIndex += 1) {
+    const channelIndex = pixelIndex * 4;
+    const luminance = (
+      (data[channelIndex] * 0.2126) +
+      (data[channelIndex + 1] * 0.7152) +
+      (data[channelIndex + 2] * 0.0722)
+    ) / 255;
+
+    data[channelIndex] = Math.round(tintColor.r * luminance);
+    data[channelIndex + 1] = Math.round(tintColor.g * luminance);
+    data[channelIndex + 2] = Math.round(tintColor.b * luminance);
+  }
+
+  return sharp(data, {
+    raw: {
+      width: info.width,
+      height: info.height,
+      channels: info.channels,
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
 function formatDebugNumber(value) {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) {
@@ -971,6 +1035,54 @@ function resolveRequestedColorKey(template, payload, manifest) {
     'white';
 
   return requestedColorKey || defaultColorKey;
+}
+
+function resolveRequestedColor(template, rawColor, manifest) {
+  if (!rawColor) {
+    return null;
+  }
+
+  const matchedColor = findMatchingColor(getAvailableMockupColors(template, manifest), rawColor);
+  if (matchedColor) {
+    return matchedColor;
+  }
+
+  const normalizedHex = normalizeHex(rawColor);
+  if (normalizedHex) {
+    return {
+      key: normalizeColorKey(rawColor),
+      label: String(rawColor).trim(),
+      hex: normalizedHex,
+    };
+  }
+
+  return null;
+}
+
+function resolveOcclusionTintColorHex({ surfaceKey, assetUrl, colorHex }) {
+  if (!colorHex) {
+    return null;
+  }
+
+  const normalizedSurfaceKey = String(surfaceKey || '').trim();
+  const normalizedAssetUrl = String(assetUrl || '').trim().toLowerCase();
+  const isNeckLabelOcclusion =
+    normalizedSurfaceKey === 'neckLabelInner'
+    || normalizedAssetUrl.includes('/neck-label-inner/')
+    || normalizedAssetUrl.includes('\\neck-label-inner\\');
+
+  return isNeckLabelOcclusion ? normalizeHex(colorHex) : null;
+}
+
+function shouldUseBasePixelsForOcclusion({ surfaceKey, assetUrl }) {
+  const normalizedSurfaceKey = String(surfaceKey || '').trim();
+  const normalizedAssetUrl = String(assetUrl || '').trim().toLowerCase();
+
+  return (
+    normalizedSurfaceKey === 'neckLabelInner'
+    || normalizedAssetUrl.includes('/neck-label-inner/')
+    || normalizedAssetUrl.includes('\\neck-label-inner\\')
+  );
 }
 
 function resolveSurfaceFolder(surfaceKey, manifest) {
@@ -1701,12 +1813,69 @@ async function cropDesignBufferToSourceCrop(buffer, sourceCropInEditorSpace, edi
     .toBuffer();
 }
 
-async function compositeAssetOverBuffer(sourceBuffer, assetUrl, width, height, blend = 'over') {
+async function compositeAssetOverBuffer(sourceBuffer, assetUrl, width, height, blend = 'over', options = {}) {
   if (!assetUrl) {
     return sourceBuffer;
   }
 
-  const overlay = await rasterizeOptionalAssetToPng(assetUrl, width, height);
+  let overlay = await rasterizeOptionalAssetToPng(assetUrl, width, height);
+  if (!overlay) {
+    return sourceBuffer;
+  }
+
+  if (options.tintColorHex) {
+    overlay = await tintMonochromeBuffer(overlay, options.tintColorHex);
+  }
+
+  return sharp(sourceBuffer)
+    .composite([
+      {
+        input: overlay,
+        blend,
+      },
+    ])
+    .png()
+    .toBuffer();
+}
+
+async function createOcclusionOverlayBuffer({
+  assetUrl,
+  width,
+  height,
+  baseBuffer = null,
+  surfaceKey = null,
+  tintColorHex = null,
+}) {
+  if (!assetUrl) {
+    return null;
+  }
+
+  let overlay = await rasterizeOptionalAssetToPng(assetUrl, width, height);
+  if (!overlay) {
+    return null;
+  }
+
+  if (baseBuffer && shouldUseBasePixelsForOcclusion({ surfaceKey, assetUrl })) {
+    return maskOverlayBySourceAlpha(baseBuffer, overlay, width, height);
+  }
+
+  if (tintColorHex) {
+    overlay = await tintMonochromeBuffer(overlay, tintColorHex);
+  }
+
+  return overlay;
+}
+
+async function compositeOcclusionOverBuffer(sourceBuffer, assetUrl, width, height, options = {}) {
+  const overlay = await createOcclusionOverlayBuffer({
+    assetUrl,
+    width,
+    height,
+    baseBuffer: options.baseBuffer || null,
+    surfaceKey: options.surfaceKey || null,
+    tintColorHex: options.tintColorHex || null,
+  });
+
   if (!overlay) {
     return sourceBuffer;
   }
@@ -1715,7 +1884,7 @@ async function compositeAssetOverBuffer(sourceBuffer, assetUrl, width, height, b
     .composite([
       {
         input: overlay,
-        blend,
+        blend: options.blend || 'over',
       },
     ])
     .png()
@@ -2514,6 +2683,8 @@ async function renderSurfacePreview({
     throw new ApiError(404, `Surface ${surfaceKey} not found in template`);
   }
 
+  const requestedColor = resolveRequestedColor(template, colorKey, manifest);
+
   const editorPrintArea = getEditorPrintArea(surface);
   const renderPrintArea = getRenderPrintArea(surface);
   const baseAssetUrl = await resolveSurfaceBaseAssetUrl({
@@ -2563,12 +2734,23 @@ async function renderSurfacePreview({
   const designBuffer = await rasterizeSvgToPng(designSvg, roundDimension(renderWidth), roundDimension(renderHeight));
 
   const placedDesign = await placeDesignOnCanvas(designBuffer, outputWidth, outputHeight, scaledRenderPrintArea);
-  const occlusionGroupBuffer = await compositeAssetOverBuffer(
+  const occlusionAssetUrl = surface.render?.assets?.occlusionImageUrl || null;
+  const baseBuffer = await rasterizeAssetToPng(baseAssetUrl, outputWidth, outputHeight);
+  const occlusionGroupBuffer = await compositeOcclusionOverBuffer(
     await createBlankPng(outputWidth, outputHeight),
-    surface.render?.assets?.occlusionImageUrl || null,
+    occlusionAssetUrl,
     outputWidth,
     outputHeight,
-    'over',
+    {
+      blend: 'over',
+      baseBuffer,
+      surfaceKey,
+      tintColorHex: resolveOcclusionTintColorHex({
+        surfaceKey,
+        assetUrl: occlusionAssetUrl,
+        colorHex: requestedColor?.hex || null,
+      }),
+    },
   );
   const { litDesignGroup, shadowOverlay, highlightOverlay } = await applySceneLightingToDesignGroup({
     designGroupBuffer: placedDesign,
@@ -2579,7 +2761,6 @@ async function renderSurfacePreview({
     outputHeight,
   });
 
-  const baseBuffer = await rasterizeAssetToPng(baseAssetUrl, outputWidth, outputHeight);
   let mergedBuffer = await compositeBuffers({
     width: outputWidth,
     height: outputHeight,
@@ -2633,6 +2814,7 @@ async function renderScenePreview({
 }) {
   const fallbackSurface = template.surfaces?.[sceneKey];
   const hasSceneLayers = Array.isArray(sceneDefinition?.layers) && sceneDefinition.layers.length > 0;
+  const requestedColor = resolveRequestedColor(template, colorKey, manifest);
 
   if (!hasSceneLayers) {
     if (!fallbackSurface) {
@@ -2729,12 +2911,22 @@ async function renderScenePreview({
       layerBuffer,
       layer.blend || 'over',
     );
-    occlusionGroupBuffer = await compositeAssetOverBuffer(
+    const occlusionAssetUrl = mergedLayerConfig.assets?.occlusionImageUrl || null;
+    occlusionGroupBuffer = await compositeOcclusionOverBuffer(
       occlusionGroupBuffer,
-      mergedLayerConfig.assets?.occlusionImageUrl || null,
+      occlusionAssetUrl,
       outputWidth,
       outputHeight,
-      'over',
+      {
+        blend: 'over',
+        baseBuffer,
+        surfaceKey,
+        tintColorHex: resolveOcclusionTintColorHex({
+          surfaceKey,
+          assetUrl: occlusionAssetUrl,
+          colorHex: requestedColor?.hex || null,
+        }),
+      },
     );
   }
 
@@ -2810,6 +3002,7 @@ async function debugRenderScenePreview({
 }) {
   const fallbackSurface = template.surfaces?.[sceneKey];
   const hasSceneLayers = Array.isArray(sceneDefinition?.layers) && sceneDefinition.layers.length > 0;
+  const requestedColor = resolveRequestedColor(template, colorKey, manifest);
 
   if (!hasSceneLayers) {
     const preview = await renderScenePreview({
@@ -2981,12 +3174,21 @@ async function debugRenderScenePreview({
       stages.designComposite,
       layer.blend || 'over',
     );
-    const nextOcclusionGroupBuffer = await compositeAssetOverBuffer(
+    const nextOcclusionGroupBuffer = await compositeOcclusionOverBuffer(
       occlusionGroupBuffer,
       mergedLayerConfig.assets?.occlusionImageUrl || null,
       outputWidth,
       outputHeight,
-      'over',
+      {
+        blend: 'over',
+        baseBuffer,
+        surfaceKey,
+        tintColorHex: resolveOcclusionTintColorHex({
+          surfaceKey,
+          assetUrl: mergedLayerConfig.assets?.occlusionImageUrl || null,
+          colorHex: requestedColor?.hex || null,
+        }),
+      },
     );
     const sceneAfterLayer = await compositeBufferOverBuffer(baseBuffer, nextDesignGroupBuffer);
     const sceneAfterOcclusion = await compositeBuffers({

@@ -306,9 +306,17 @@
 .left-sidebar {
   display: flex;
   flex-direction: row;
+  flex: 0 0 68px;
+  width: 68px;
+  min-width: 68px;
   height: 100%;
   position: relative;
   z-index: 100;
+  overflow: visible;
+}
+
+.left-sidebar.expanded {
+  z-index: 120;
 }
 
 .lt-rail {
@@ -353,9 +361,13 @@
 }
 
 .lt-panel {
+  position: absolute;
+  top: 0;
+  left: 68px;
+  bottom: 0;
   width: 300px;
-  min-width: 300px;
-  height: 100%;
+  min-width: 0;
+  height: auto;
   display: flex;
   flex-direction: column;
   background: var(--white);
@@ -363,6 +375,7 @@
   box-shadow: var(--shadow-md);
   animation: slideIn 0.2s ease;
   overflow: hidden;
+  z-index: 130;
 }
 
 @keyframes slideIn {

@@ -1,0 +1,185 @@
+{
+  "templateId": "69c90217d198d7d50cf31a0e",
+  "colorKey": "gold",
+  "format": "png",
+  "outputDir": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug",
+  "scenes": [
+    {
+      "sceneKey": "frontCollarCloseup",
+      "label": "Front Collar Closeup",
+      "width": 2048,
+      "height": 2048,
+      "previewPath": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\final-preview.png",
+      "debugScene": {
+        "baseAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/colors/gold/base.png",
+        "outputWidth": 2048,
+        "outputHeight": 2048,
+        "layers": [
+          {
+            "index": 0,
+            "type": "surface",
+            "surfaceKey": "neckLabelInner",
+            "assetUrl": null,
+            "blend": "over",
+            "geometry": {
+              "editorPrintArea": {
+                "x": 285.56,
+                "y": 250,
+                "width": 300,
+                "height": 300,
+                "safeZone": null,
+                "bleed": null,
+                "anchor": null,
+                "cornerRadius": null,
+                "unit": "scene",
+                "origin": "top-left"
+              },
+              "sourceCrop": null,
+              "sourceCropInEditorSpace": null,
+              "renderPrintArea": {
+                "x": 693.25,
+                "y": 716.53,
+                "width": 480.31,
+                "height": 480.31
+              },
+              "renderPrintQuad": {
+                "topLeft": {
+                  "x": 801.3,
+                  "y": 716.53
+                },
+                "topRight": {
+                  "x": 1269.3,
+                  "y": 824.58
+                },
+                "bottomRight": {
+                  "x": 1161.25,
+                  "y": 1292.58
+                },
+                "bottomLeft": {
+                  "x": 693.25,
+                  "y": 1184.53
+                }
+              },
+              "renderPrintQuadBounds": {
+                "x": 693.25,
+                "y": 716.53,
+                "width": 576.05,
+                "height": 576.05
+              },
+              "rotationDeg": 13,
+              "configuredWidth": 2048,
+              "configuredHeight": 2048,
+              "designBounds": {
+                "x": 63,
+                "y": 63,
+                "width": 355,
+                "height": 355,
+                "pixelCount": 124613
+              },
+              "placedBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "maskedBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "warpedBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "clippedBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "compositeBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "maskCoverageBounds": {
+                "x": 693,
+                "y": 717,
+                "width": 576,
+                "height": 576,
+                "pixelCount": 231768
+              },
+              "occlusionBounds": {
+                "x": 685,
+                "y": 1039,
+                "width": 529,
+                "height": 265,
+                "pixelCount": 52501
+              },
+              "assetUrls": {
+                "shadowAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/shadow.png",
+                "highlightAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/highlight.png",
+                "maskAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/mask.png",
+                "displacementAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/displacement.png",
+                "occlusionAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/occlusion.png"
+              }
+            },
+            "stagePaths": {
+              "sceneBeforeLayer": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\scenebeforelayer.png",
+              "sceneWithGuides": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\scenewithguides.png",
+              "placedOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\placedoverscene.png",
+              "maskedOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\maskedoverscene.png",
+              "warpedOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\warpedoverscene.png",
+              "clippedOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\clippedoverscene.png",
+              "compositeOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\compositeoverscene.png",
+              "sceneAfterLayer": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\sceneafterlayer.png",
+              "sceneAfterOcclusion": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\00-surface-necklabelinner\\sceneafterocclusion.png"
+            }
+          },
+          {
+            "index": 1,
+            "type": "sceneLighting",
+            "surfaceKey": null,
+            "assetUrl": null,
+            "blend": "over",
+            "geometry": {
+              "shadowBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 125466
+              },
+              "highlightBounds": {
+                "x": 769,
+                "y": 793,
+                "width": 425,
+                "height": 424,
+                "pixelCount": 86165
+              },
+              "assetUrls": {
+                "shadowAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/shadow.png",
+                "highlightAssetUrl": "/mockups/basic-tshirt/scenes/front-collar-closeup/layers/neck-label-inner/highlight.png"
+              }
+            },
+            "stagePaths": {
+              "sceneBeforeLighting": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\01-scenelighting-layer\\scenebeforelighting.png",
+              "shadowOverlayOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\01-scenelighting-layer\\shadowoverlayoverscene.png",
+              "highlightOverlayOverScene": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\01-scenelighting-layer\\highlightoverlayoverscene.png",
+              "sceneAfterLighting": "C:\\SangHV\\printity\\backend\\tmp-frontcollar-debug\\frontcollarcloseup\\01-scenelighting-layer\\sceneafterlighting.png"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
