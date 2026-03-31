@@ -1051,19 +1051,50 @@ export function EditorProvider({ children, templateDef: providedTemplateDef, ini
 
         const pa = _getPrintArea();
         const bRect = obj.getBoundingRect();
-        let newLeft = obj.left;
-        let newTop = obj.top;
+        const center = obj.getCenterPoint();
+        const boundsLeft = Number(bRect.left ?? bRect.x) || 0;
+        const boundsTop = Number(bRect.top ?? bRect.y) || 0;
+        const boundsWidth = Number(bRect.width) || 0;
+        const boundsHeight = Number(bRect.height) || 0;
+        const printAreaLeft = Number(pa.x) || 0;
+        const printAreaTop = Number(pa.y) || 0;
+        const printAreaRight = printAreaLeft + (Number(pa.width) || 0);
+        const printAreaBottom = printAreaTop + (Number(pa.height) || 0);
+        const printAreaCenterX = printAreaLeft + ((Number(pa.width) || 0) / 2);
+        const printAreaCenterY = printAreaTop + ((Number(pa.height) || 0) / 2);
+        let deltaX = 0;
+        let deltaY = 0;
 
         switch (alignment) {
-            case 'left': newLeft = pa.x; break;
-            case 'right': newLeft = pa.x + pa.width - bRect.width; break;
-            case 'top': newTop = pa.y; break;
-            case 'bottom': newTop = pa.y + pa.height - bRect.height; break;
-            case 'centerH': newLeft = pa.x + (pa.width - bRect.width) / 2; break;
-            case 'centerV': newTop = pa.y + (pa.height - bRect.height) / 2; break;
+            case 'left':
+                deltaX = printAreaLeft - boundsLeft;
+                break;
+            case 'right':
+                deltaX = printAreaRight - (boundsLeft + boundsWidth);
+                break;
+            case 'top':
+                deltaY = printAreaTop - boundsTop;
+                break;
+            case 'bottom':
+                deltaY = printAreaBottom - (boundsTop + boundsHeight);
+                break;
+            case 'centerH':
+                deltaX = printAreaCenterX - (Number(center.x) || 0);
+                break;
+            case 'centerV':
+                deltaY = printAreaCenterY - (Number(center.y) || 0);
+                break;
             default: break;
         }
-        obj.set({ left: newLeft, top: newTop });
+
+        obj.setPositionByOrigin(
+            new Point(
+                (Number(center.x) || 0) + deltaX,
+                (Number(center.y) || 0) + deltaY
+            ),
+            'center',
+            'center'
+        );
         obj.setCoords();
         canvas.requestRenderAll();
         pushHistory();
