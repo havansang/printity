@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { fallbackTemplates } from './fallbackTemplates';
 import { fetchProjects, fetchTemplates } from './homeApi';
@@ -16,6 +16,11 @@ export function useHomeData(productType) {
     const [projects, setProjects] = useState([]);
     const [projectsLoading, setProjectsLoading] = useState(false);
     const [projectsError, setProjectsError] = useState('');
+    const [projectsReloadToken, setProjectsReloadToken] = useState(0);
+
+    const refreshProjects = useCallback(() => {
+        setProjectsReloadToken((currentValue) => currentValue + 1);
+    }, []);
 
     useEffect(() => {
         let isCancelled = false;
@@ -58,7 +63,7 @@ export function useHomeData(productType) {
         setProjectsLoading(true);
         setProjectsError('');
 
-        fetchProjects(token)
+        fetchProjects(token, { limit: 100 })
             .then((payload) => {
                 if (isCancelled) return;
                 setProjects(payload?.data?.items || []);
@@ -75,7 +80,7 @@ export function useHomeData(productType) {
         return () => {
             isCancelled = true;
         };
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated, projectsReloadToken, token]);
 
     const surfaceCount = useMemo(() => {
         const keys = new Set();
@@ -92,6 +97,7 @@ export function useHomeData(productType) {
         projects,
         projectsLoading,
         projectsError,
+        refreshProjects,
         surfaceCount,
     };
 }

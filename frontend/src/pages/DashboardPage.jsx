@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../app/router';
 import { useAuth } from '../features/auth/AuthContext';
 import { useHomeData } from '../features/home/useHomeData';
+import { deleteProject } from '../features/home/homeApi';
 import { APP_CONFIG } from '../shared/config/appConfig';
 import { resolveRenderableAssetUrl } from '../shared/lib/assetUrls';
 import { formatDateTime, formatProductType, getInitials } from '../shared/lib/formatters';
@@ -79,6 +80,62 @@ function ProjectSkeletonCard() {
             <div className="skeleton-line skeleton-line-short" />
         </article>
     );
+}
+
+function ProjectListSkeletonRow() {
+    return (
+        <div className="dashboard-products-row dashboard-products-row-skeleton">
+            <div className="dashboard-products-checkbox-cell">
+                <div className="dashboard-products-checkbox-skeleton skeleton-line" />
+            </div>
+            <div className="dashboard-products-product-cell">
+                <div className="dashboard-products-thumb dashboard-products-thumb-skeleton skeleton-box" />
+                <div className="dashboard-products-copy">
+                    <div className="skeleton-line skeleton-line-title" />
+                    <div className="skeleton-line" />
+                </div>
+            </div>
+            <div className="skeleton-line skeleton-line-short" />
+            <div className="skeleton-line skeleton-line-short" />
+            <div className="skeleton-line skeleton-line-short" />
+            <div className="dashboard-products-actions-cell">
+                <div className="dashboard-products-icon-skeleton skeleton-line" />
+                <div className="dashboard-products-icon-skeleton skeleton-line" />
+            </div>
+        </div>
+    );
+}
+
+function formatProjectStatus(status) {
+    const normalizedStatus = String(status || 'draft').trim().toLowerCase();
+
+    if (normalizedStatus === 'completed') return 'Completed';
+    if (normalizedStatus === 'draft') return 'Draft';
+    return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+}
+
+function sortProjects(items, sortValue) {
+    const sortedItems = [...items];
+
+    sortedItems.sort((left, right) => {
+        switch (sortValue) {
+            case 'updated-asc':
+                return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
+            case 'created-desc':
+                return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+            case 'created-asc':
+                return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+            case 'name-asc':
+                return String(left.name || '').localeCompare(String(right.name || ''));
+            case 'status':
+                return String(left.status || '').localeCompare(String(right.status || ''));
+            case 'updated-desc':
+            default:
+                return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+        }
+    });
+
+    return sortedItems;
 }
 
 function DashboardOverview({
@@ -198,22 +255,152 @@ function DashboardOverview({
     );
 }
 
-function ProductsView({ projects, projectsLoading, projectsError }) {
+function ProductsView({ projects, projectsLoading, projectsError, refreshProjects, token }) {
+    const [searchValue, setSearchValue] = useState('');
+    const [sortValue, setSortValue] = useState('updated-desc');
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [busyIds, setBusyIds] = useState([]);
+    const [actionError, setActionError] = useState('');
+    const [actionMessage, setActionMessage] = useState('');
+    const selectAllRef = useRef(null);
+
+    const filteredProjects = useMemo(() => {
+        const normalizedSearchValue = searchValue.trim().toLowerCase();
+        const visibleItems = normalizedSearchValue
+            ? projects.filter((project) => (
+                String(project?.name || '').toLowerCase().includes(normalizedSearchValue)
+                || String(project?.productType || '').toLowerCase().includes(normalizedSearchValue)
+                || String(project?.status || '').toLowerCase().includes(normalizedSearchValue)
+            ))
+            : projects;
+
+        return sortProjects(visibleItems, sortValue);
+    }, [projects, searchValue, sortValue]);
+
+    const selectedVisibleCount = useMemo(
+        () => filteredProjects.filter((project) => selectedIds.includes(project.id)).length,
+        [filteredProjects, selectedIds]
+    );
+    const allVisibleSelected = filteredProjects.length > 0 && selectedVisibleCount === filteredProjects.length;
+
+    useEffect(() => {
+        setSelectedIds((currentValue) => currentValue.filter((id) => projects.some((project) => project.id === id)));
+    }, [projects]);
+
+    useEffect(() => {
+        if (!selectAllRef.current) return;
+        selectAllRef.current.indeterminate = selectedVisibleCount > 0 && !allVisibleSelected;
+    }, [allVisibleSelected, selectedVisibleCount]);
+
+    const toggleProjectSelection = (projectId) => {
+        setSelectedIds((currentValue) => (
+            currentValue.includes(projectId)
+                ? currentValue.filter((id) => id !== projectId)
+                : [...currentValue, projectId]
+        ));
+    };
+
+    const toggleAllVisible = () => {
+        const visibleIds = filteredProjects.map((project) => project.id);
+
+        if (allVisibleSelected) {
+            setSelectedIds((currentValue) => currentValue.filter((id) => !visibleIds.includes(id)));
+            return;
+        }
+
+        setSelectedIds((currentValue) => Array.from(new Set([...currentValue, ...visibleIds])));
+    };
+
+    const handleDeleteProjects = async (projectIds) => {
+        const normalizedIds = Array.from(new Set((Array.isArray(projectIds) ? projectIds : []).filter(Boolean)));
+        if (!token || normalizedIds.length === 0 || isDeleting) return;
+
+        const confirmed = window.confirm(
+            normalizedIds.length === 1
+                ? 'Delete this product draft?'
+                : `Delete ${normalizedIds.length} selected product drafts?`
+        );
+        if (!confirmed) return;
+
+        setIsDeleting(true);
+        setBusyIds(normalizedIds);
+        setActionError('');
+        setActionMessage('');
+
+        try {
+            const results = await Promise.allSettled(
+                normalizedIds.map((projectId) => deleteProject(token, projectId))
+            );
+            const succeededIds = normalizedIds.filter((_, index) => results[index]?.status === 'fulfilled');
+            const failedCount = normalizedIds.length - succeededIds.length;
+
+            if (succeededIds.length > 0) {
+                await refreshProjects();
+                setSelectedIds((currentValue) => currentValue.filter((id) => !succeededIds.includes(id)));
+                setActionMessage(
+                    succeededIds.length === 1
+                        ? 'Product deleted successfully.'
+                        : `${succeededIds.length} products deleted successfully.`
+                );
+            }
+
+            if (failedCount > 0) {
+                throw new Error(
+                    failedCount === 1
+                        ? 'One product could not be deleted.'
+                        : `${failedCount} products could not be deleted.`
+                );
+            }
+        } catch (error) {
+            setActionError(error?.message || 'Unable to delete the selected products.');
+        } finally {
+            setBusyIds([]);
+            setIsDeleting(false);
+        }
+    };
+
     return (
-        <section className="dashboard-section-card">
+        <section className="dashboard-section-card dashboard-products-list-card">
             <div className="dashboard-section-head">
                 <div>
                     <p className="section-kicker">My Product</p>
-                    <h2>Review the projects you have already created.</h2>
+                    <h2>Manage the product drafts already saved in your workspace.</h2>
                 </div>
 
-                <button
-                    type="button"
-                    className="ghost-action"
-                    onClick={() => navigate('/editor')}
-                >
-                    Open design studio
-                </button>
+                <div className="dashboard-products-head-actions">
+                    <label className="dashboard-products-search" htmlFor="dashboard-products-search">
+                        <SearchIcon />
+                        <input
+                            id="dashboard-products-search"
+                            type="search"
+                            placeholder="Search products"
+                            value={searchValue}
+                            onChange={(event) => setSearchValue(event.target.value)}
+                        />
+                    </label>
+
+                    <select
+                        className="dashboard-products-sort"
+                        value={sortValue}
+                        onChange={(event) => setSortValue(event.target.value)}
+                    >
+                        <option value="updated-desc">Recently updated</option>
+                        <option value="updated-asc">Oldest updated</option>
+                        <option value="created-desc">Newest created</option>
+                        <option value="created-asc">Oldest created</option>
+                        <option value="name-asc">Name A-Z</option>
+                        <option value="status">Status</option>
+                    </select>
+
+                    <button
+                        type="button"
+                        className="ghost-action"
+                        onClick={() => navigate('/editor')}
+                    >
+                        Create product
+                    </button>
+                </div>
             </div>
 
             {projectsError && (
@@ -222,42 +409,158 @@ function ProductsView({ projects, projectsLoading, projectsError }) {
                 </div>
             )}
 
-            <div className="dashboard-product-grid">
-                {projectsLoading && Array.from({ length: 3 }).map((_, index) => (
-                    <ProjectSkeletonCard key={index} />
-                ))}
-
-                {!projectsLoading && projects.length === 0 && (
-                    <div className="dashboard-empty-state">
-                        <h3>No saved products yet.</h3>
-                        <p>Your projects will appear here after you save them from the editor.</p>
+            {(actionError || actionMessage || selectedIds.length > 0) && (
+                <div className="dashboard-products-bulkbar">
+                    <div className="dashboard-products-bulkbar-copy">
+                        {selectedIds.length > 0 ? (
+                            <strong>{selectedIds.length} selected</strong>
+                        ) : (
+                            <strong>Workspace updates</strong>
+                        )}
+                        {actionError && <span className="dashboard-products-error">{actionError}</span>}
+                        {!actionError && actionMessage && <span className="dashboard-products-message">{actionMessage}</span>}
                     </div>
-                )}
 
-                {!projectsLoading && projects.map((project) => (
-                    <article key={project.id} className="dashboard-product-card">
-                        <div className="dashboard-product-card-top">
-                            <span className={`project-status status-${project.status || 'draft'}`}>
-                                {project.status || 'draft'}
-                            </span>
-                            <span className="project-type">{formatProductType(project.productType)}</span>
-                        </div>
-
-                        <h3>{project.name}</h3>
-                        <p>Template ID: {project.templateId}</p>
-                        <time dateTime={project.updatedAt}>
-                            Updated {formatDateTime(project.updatedAt)}
-                        </time>
-
+                    <div className="dashboard-products-bulkbar-actions">
+                        {selectedIds.length > 0 && (
+                            <button
+                                type="button"
+                                className="header-outline-action"
+                                onClick={() => setSelectedIds([])}
+                                disabled={isDeleting}
+                            >
+                                Clear selection
+                            </button>
+                        )}
                         <button
                             type="button"
-                            className="ghost-action ghost-action-inline"
-                            onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
+                            className="dashboard-products-delete-btn"
+                            onClick={() => handleDeleteProjects(selectedIds)}
+                            disabled={selectedIds.length === 0 || isDeleting}
                         >
-                            Resume in studio
+                            {isDeleting ? 'Deleting...' : 'Delete selected'}
                         </button>
-                    </article>
-                ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="dashboard-products-table">
+                <div className="dashboard-products-table-head">
+                    <label className="dashboard-products-select-all">
+                        <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={allVisibleSelected}
+                            onChange={toggleAllVisible}
+                            disabled={projectsLoading || filteredProjects.length === 0}
+                        />
+                        <span>Select all</span>
+                    </label>
+                    <span>Product</span>
+                    <span>Type</span>
+                    <span>Updated</span>
+                    <span>Status</span>
+                    <span className="dashboard-products-actions-head">Actions</span>
+                </div>
+
+                <div className="dashboard-products-table-body">
+                    {projectsLoading && Array.from({ length: 5 }).map((_, index) => (
+                        <ProjectListSkeletonRow key={index} />
+                    ))}
+
+                    {!projectsLoading && projects.length === 0 && (
+                        <div className="dashboard-empty-state">
+                            <h3>No saved products yet.</h3>
+                            <p>Your projects will appear here after you save them from the editor.</p>
+                        </div>
+                    )}
+
+                    {!projectsLoading && projects.length > 0 && filteredProjects.length === 0 && (
+                        <div className="dashboard-empty-state">
+                            <h3>No products matched that search.</h3>
+                            <p>Try another keyword or clear the search field.</p>
+                        </div>
+                    )}
+
+                    {!projectsLoading && filteredProjects.map((project) => {
+                        const thumbnailUrl = resolveRenderableAssetUrl(project.thumbnailUrl);
+                        const isBusy = busyIds.includes(project.id);
+
+                        return (
+                            <article key={project.id} className="dashboard-products-row">
+                                <div className="dashboard-products-checkbox-cell">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.includes(project.id)}
+                                        onChange={() => toggleProjectSelection(project.id)}
+                                        disabled={isDeleting}
+                                        aria-label={`Select ${project.name}`}
+                                    />
+                                </div>
+
+                                <div className="dashboard-products-product-cell">
+                                    <div className="dashboard-products-thumb">
+                                        {thumbnailUrl ? (
+                                            <img src={thumbnailUrl} alt={project.name} />
+                                        ) : (
+                                            <span className="dashboard-products-thumb-fallback">
+                                                <ProductsIcon />
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="dashboard-products-copy">
+                                        <button
+                                            type="button"
+                                            className="dashboard-products-name"
+                                            onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
+                                        >
+                                            {project.name}
+                                        </button>
+                                        <p>{formatProductType(project.productType)} product draft</p>
+                                        <span>Template ID: {project.templateId}</span>
+                                    </div>
+                                </div>
+
+                                <div className="dashboard-products-meta-cell">
+                                    <strong>{formatProductType(project.productType)}</strong>
+                                    <span>{project.productType || 'custom'}</span>
+                                </div>
+
+                                <div className="dashboard-products-meta-cell">
+                                    <strong>{formatDateTime(project.updatedAt)}</strong>
+                                    <span>Created {formatDateTime(project.createdAt)}</span>
+                                </div>
+
+                                <div className="dashboard-products-status-cell">
+                                    <span className={`dashboard-products-status status-${project.status || 'draft'}`}>
+                                        {formatProjectStatus(project.status)}
+                                    </span>
+                                </div>
+
+                                <div className="dashboard-products-actions-cell">
+                                    <button
+                                        type="button"
+                                        className="dashboard-products-icon-btn"
+                                        onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
+                                        title="Resume in studio"
+                                    >
+                                        <EditIcon />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="dashboard-products-icon-btn danger"
+                                        onClick={() => handleDeleteProjects([project.id])}
+                                        disabled={isBusy || isDeleting}
+                                        title="Delete product"
+                                    >
+                                        <TrashIcon />
+                                    </button>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
             </div>
         </section>
     );
@@ -318,7 +621,7 @@ function AccountView({ user, onLogout }) {
 }
 
 export default function DashboardPage({ search }) {
-    const { isAuthenticated, isInitializing, user, logout } = useAuth();
+    const { isAuthenticated, isInitializing, user, logout, token } = useAuth();
     const [productType, setProductType] = useState('all');
     const currentTab = useMemo(() => resolveDashboardTab(search), [search]);
     const {
@@ -328,6 +631,7 @@ export default function DashboardPage({ search }) {
         projects,
         projectsLoading,
         projectsError,
+        refreshProjects,
     } = useHomeData(productType);
 
     useEffect(() => {
@@ -429,6 +733,8 @@ export default function DashboardPage({ search }) {
                         projects={projects}
                         projectsLoading={projectsLoading}
                         projectsError={projectsError}
+                        refreshProjects={refreshProjects}
+                        token={token}
                     />
                 )}
 
@@ -453,6 +759,39 @@ function ProductsIcon() {
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
                 d="M6 5h12l1 3v10H5V8l1-3Zm2.2 2L8 8h8l-.2-1H8.2ZM9 11h6v2H9v-2Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function SearchIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="M10.5 4a6.5 6.5 0 1 0 4.13 11.52l4.42 4.42 1.41-1.41-4.42-4.42A6.5 6.5 0 0 0 10.5 4Zm0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function EditIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="m16.86 3.49 3.65 3.65-9.77 9.78-4.37.72.72-4.37 9.77-9.78Zm-10.3 11.7-.3 1.83 1.83-.3 8.94-8.95-1.53-1.53-8.94 8.95Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function TrashIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21a2 2 0 0 1-2-2V8h16v11a2 2 0 0 1-2 2H6Z"
                 fill="currentColor"
             />
         </svg>

@@ -56,3 +56,10 @@ export function updateProject(token, projectId, body) {
         body,
     });
 }
+
+export function deleteProject(token, projectId) {
+    return apiRequest(`/projects/${projectId}`, {
+        method: 'DELETE',
+        token,
+    });
+}
