@@ -1,10 +1,15 @@
-export function formatDateTime(value) {
+function resolveLocale(language = 'en') {
+    if (language === 'vi') return 'vi-VN';
+    return 'en-US';
+}
+
+export function formatDateTime(value, language = 'en') {
     if (!value) return 'Just now';
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Just now';
 
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(resolveLocale(language), {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -27,9 +32,9 @@ export function getInitials(value) {
         .toUpperCase();
 }
 
-export function formatProductType(productType) {
-    if (!productType) return 'Custom product';
-    if (productType === 'tshirt') return 'T-shirt';
-    if (productType === 'polo') return 'Polo';
+export function formatProductType(productType, language = 'en') {
+    if (!productType) return language === 'vi' ? 'Sản phẩm tuỳ chỉnh' : 'Custom product';
+    if (productType === 'tshirt') return language === 'vi' ? 'Áo thun' : 'T-shirt';
+    if (productType === 'polo') return language === 'vi' ? 'Áo polo' : 'Polo';
     return String(productType);
 }

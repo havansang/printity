@@ -3,15 +3,232 @@ import { navigate } from '../app/router';
 import { useAuth } from '../features/auth/AuthContext';
 import { useHomeData } from '../features/home/useHomeData';
 import { deleteProject } from '../features/home/homeApi';
+import { useLanguage } from '../features/language/LanguageContext';
 import { APP_CONFIG } from '../shared/config/appConfig';
 import { resolveRenderableAssetUrl } from '../shared/lib/assetUrls';
 import { formatDateTime, formatProductType, getInitials } from '../shared/lib/formatters';
 
 const DASHBOARD_TABS = [
-    { key: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
-    { key: 'products', label: 'My Product', icon: ProductsIcon },
-    { key: 'account', label: 'Account', icon: AccountIcon },
+    { key: 'dashboard', labelKey: 'dashboard', icon: DashboardIcon },
+    { key: 'products', labelKey: 'products', icon: ProductsIcon },
+    { key: 'account', labelKey: 'account', icon: AccountIcon },
 ];
+
+const DASHBOARD_COPY = {
+    en: {
+        tabs: {
+            dashboard: 'Dashboard',
+            products: 'My Product',
+            account: 'Account',
+            language: 'Language',
+        },
+        languages: {
+            current: 'Current',
+            en: 'English',
+            vi: 'Tiếng Việt',
+        },
+        loadingWorkspace: 'Preparing your workspace...',
+        signedIn: 'Signed in',
+        openDesignStudio: 'Open design studio',
+        dashboardSubtitles: {
+            dashboard: 'Browse templates and start a new design flow.',
+            products: 'Check the projects you already created and continue working on them.',
+            account: 'See the email currently connected to this workspace.',
+        },
+        overview: {
+            heroEyebrow: 'Workspace',
+            heroTitle: 'Pick a template and move straight into design.',
+            heroDescription: 'Your studio is ready. Start from a product template, continue a saved idea, or keep your account details close at hand.',
+            metrics: {
+                templates: 'Templates',
+                templatesSub: 'Ready for customization',
+                products: 'My Product',
+                productsSub: 'Saved drafts in workspace',
+                account: 'Account',
+                accountSub: 'Signed-in email',
+            },
+            sectionKicker: 'Dashboard',
+            sectionTitle: 'Choose a template to start designing.',
+            templateFilterAria: 'Template product type',
+            allProducts: 'All products',
+            noTemplatesTitle: 'No templates are available right now.',
+            noTemplatesDescription: 'Try another product filter or come back after the catalog sync finishes.',
+            fallbackTemplateDescription: 'Ready-to-edit product shell for your next design.',
+            surfacesLabel: 'surfaces',
+            colorsLabel: 'colors',
+            designButton: 'Design this template',
+            notAvailable: 'Not available',
+        },
+        productsView: {
+            sectionKicker: 'My Product',
+            title: 'Manage the product drafts already saved in your workspace.',
+            searchPlaceholder: 'Search products',
+            createProduct: 'Create product',
+            workspaceUpdates: 'Workspace updates',
+            selectedLabel: 'selected',
+            clearSelection: 'Clear selection',
+            deleteSelected: 'Delete selected',
+            deleting: 'Deleting...',
+            selectAll: 'Select all',
+            columns: {
+                product: 'Product',
+                type: 'Type',
+                updated: 'Updated',
+                status: 'Status',
+                actions: 'Actions',
+            },
+            sortOptions: {
+                updatedDesc: 'Recently updated',
+                updatedAsc: 'Oldest updated',
+                createdDesc: 'Newest created',
+                createdAsc: 'Oldest created',
+                nameAsc: 'Name A-Z',
+                status: 'Status',
+            },
+            noProjectsTitle: 'No saved products yet.',
+            noProjectsDescription: 'Your projects will appear here after you save them from the editor.',
+            noSearchTitle: 'No products matched that search.',
+            noSearchDescription: 'Try another keyword or clear the search field.',
+            productDraftSuffix: 'product draft',
+            templateIdLabel: 'Template ID',
+            createdLabel: 'Created',
+            resumeInStudio: 'Resume in studio',
+            deleteProduct: 'Delete product',
+            deleteConfirmSingle: 'Delete this product draft?',
+            deleteConfirmMultiple: 'Delete {count} selected product drafts?',
+            deletedSingle: 'Product deleted successfully.',
+            deletedMultiple: '{count} products deleted successfully.',
+            deleteFailedSingle: 'One product could not be deleted.',
+            deleteFailedMultiple: '{count} products could not be deleted.',
+            deleteFallbackError: 'Unable to delete the selected products.',
+            statusLabels: {
+                draft: 'Draft',
+                completed: 'Completed',
+            },
+        },
+        accountView: {
+            sectionKicker: 'Account',
+            title: 'Keep your workspace identity simple and visible.',
+            fallbackName: 'Workspace user',
+            noEmail: 'No email available',
+            emailLabel: 'Email',
+            statusLabel: 'Status',
+            authenticated: 'Authenticated',
+            openStudio: 'Open studio',
+            logout: 'Log out',
+        },
+    },
+    vi: {
+        tabs: {
+            dashboard: 'Bảng điều khiển',
+            products: 'Sản phẩm của tôi',
+            account: 'Tài khoản',
+            language: 'Ngôn ngữ',
+        },
+        languages: {
+            current: 'Đang dùng',
+            en: 'English',
+            vi: 'Tiếng Việt',
+        },
+        loadingWorkspace: 'Đang chuẩn bị không gian làm việc...',
+        signedIn: 'Đã đăng nhập',
+        openDesignStudio: 'Mở trình thiết kế',
+        dashboardSubtitles: {
+            dashboard: 'Xem template và bắt đầu một luồng thiết kế mới.',
+            products: 'Kiểm tra các dự án bạn đã tạo và tiếp tục chỉnh sửa.',
+            account: 'Xem email hiện đang kết nối với workspace này.',
+        },
+        overview: {
+            heroEyebrow: 'Workspace',
+            heroTitle: 'Chọn template và đi thẳng vào thiết kế.',
+            heroDescription: 'Studio của bạn đã sẵn sàng. Hãy bắt đầu từ một template sản phẩm, tiếp tục bản nháp đã lưu hoặc xem nhanh thông tin tài khoản.',
+            metrics: {
+                templates: 'Template',
+                templatesSub: 'Sẵn sàng để tuỳ chỉnh',
+                products: 'Sản phẩm',
+                productsSub: 'Bản nháp đã lưu trong workspace',
+                account: 'Tài khoản',
+                accountSub: 'Email đang đăng nhập',
+            },
+            sectionKicker: 'Bảng điều khiển',
+            sectionTitle: 'Chọn template để bắt đầu thiết kế.',
+            templateFilterAria: 'Loại sản phẩm template',
+            allProducts: 'Tất cả sản phẩm',
+            noTemplatesTitle: 'Hiện chưa có template khả dụng.',
+            noTemplatesDescription: 'Hãy thử bộ lọc sản phẩm khác hoặc quay lại sau khi quá trình đồng bộ catalog hoàn tất.',
+            fallbackTemplateDescription: 'Khung sản phẩm sẵn sàng chỉnh sửa cho thiết kế tiếp theo của bạn.',
+            surfacesLabel: 'bề mặt',
+            colorsLabel: 'màu',
+            designButton: 'Thiết kế template này',
+            notAvailable: 'Chưa có',
+        },
+        productsView: {
+            sectionKicker: 'Sản phẩm của tôi',
+            title: 'Quản lý các bản nháp sản phẩm đã lưu trong workspace của bạn.',
+            searchPlaceholder: 'Tìm kiếm sản phẩm',
+            createProduct: 'Tạo sản phẩm',
+            workspaceUpdates: 'Cập nhật workspace',
+            selectedLabel: 'đã chọn',
+            clearSelection: 'Bỏ chọn',
+            deleteSelected: 'Xóa mục đã chọn',
+            deleting: 'Đang xóa...',
+            selectAll: 'Chọn tất cả',
+            columns: {
+                product: 'Sản phẩm',
+                type: 'Loại',
+                updated: 'Cập nhật',
+                status: 'Trạng thái',
+                actions: 'Thao tác',
+            },
+            sortOptions: {
+                updatedDesc: 'Cập nhật gần đây',
+                updatedAsc: 'Cập nhật cũ nhất',
+                createdDesc: 'Tạo mới nhất',
+                createdAsc: 'Tạo cũ nhất',
+                nameAsc: 'Tên A-Z',
+                status: 'Trạng thái',
+            },
+            noProjectsTitle: 'Chưa có sản phẩm nào được lưu.',
+            noProjectsDescription: 'Dự án của bạn sẽ xuất hiện ở đây sau khi được lưu từ editor.',
+            noSearchTitle: 'Không có sản phẩm nào khớp với từ khóa tìm kiếm.',
+            noSearchDescription: 'Hãy thử từ khóa khác hoặc xóa ô tìm kiếm.',
+            productDraftSuffix: 'bản nháp sản phẩm',
+            templateIdLabel: 'Mã template',
+            createdLabel: 'Tạo lúc',
+            resumeInStudio: 'Mở lại trong studio',
+            deleteProduct: 'Xóa sản phẩm',
+            deleteConfirmSingle: 'Xóa bản nháp sản phẩm này?',
+            deleteConfirmMultiple: 'Xóa {count} bản nháp sản phẩm đã chọn?',
+            deletedSingle: 'Đã xóa sản phẩm thành công.',
+            deletedMultiple: 'Đã xóa thành công {count} sản phẩm.',
+            deleteFailedSingle: 'Có một sản phẩm không thể xóa.',
+            deleteFailedMultiple: 'Có {count} sản phẩm không thể xóa.',
+            deleteFallbackError: 'Không thể xóa các sản phẩm đã chọn.',
+            statusLabels: {
+                draft: 'Bản nháp',
+                completed: 'Hoàn tất',
+            },
+        },
+        accountView: {
+            sectionKicker: 'Tài khoản',
+            title: 'Giữ thông tin workspace của bạn rõ ràng và dễ nhìn.',
+            fallbackName: 'Người dùng workspace',
+            noEmail: 'Chưa có email',
+            emailLabel: 'Email',
+            statusLabel: 'Trạng thái',
+            authenticated: 'Đã xác thực',
+            openStudio: 'Mở studio',
+            logout: 'Đăng xuất',
+        },
+    },
+};
+
+function interpolateLabel(template, values = {}) {
+    return Object.entries(values).reduce(
+        (result, [key, value]) => result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value)),
+        String(template || '')
+    );
+}
 
 function resolveDashboardTab(search) {
     const params = new URLSearchParams(search || '');
@@ -61,6 +278,82 @@ function SidebarNavButton({ isActive, label, icon: Icon, onClick }) {
     );
 }
 
+function LanguageSidebarControl({
+    language,
+    setLanguage,
+    languageOptions,
+    labels,
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handlePointerDown = (event) => {
+            if (!dropdownRef.current?.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, []);
+
+    const activeOption = languageOptions.find((item) => item.code === language) || languageOptions[0];
+
+    return (
+        <div ref={dropdownRef} className={`dashboard-language-switcher${isOpen ? ' open' : ''}`}>
+            <button
+                type="button"
+                className={`dashboard-sidebar-link dashboard-language-trigger${isOpen ? ' active' : ''}`}
+                onClick={() => setIsOpen((currentValue) => !currentValue)}
+            >
+                <span className="dashboard-sidebar-link-icon">
+                    <LanguageIcon />
+                </span>
+                <span className="dashboard-language-trigger-copy">
+                    <span>{labels.tabs.language}</span>
+                    <small>{activeOption?.label || labels.languages.en}</small>
+                </span>
+                <span className={`dashboard-language-chevron${isOpen ? ' open' : ''}`}>
+                    <ChevronDownIcon />
+                </span>
+            </button>
+
+            {isOpen && (
+                <div className="dashboard-language-menu">
+                    {languageOptions.map((option) => {
+                        const isActive = option.code === language;
+
+                        return (
+                            <button
+                                key={option.code}
+                                type="button"
+                                className={`dashboard-language-option${isActive ? ' active' : ''}`}
+                                onClick={() => {
+                                    setLanguage(option.code);
+                                    setIsOpen(false);
+                                }}
+                            >
+                                <span className="dashboard-language-option-copy">
+                                    <strong>{labels.languages[option.code] || option.label}</strong>
+                                    <small>
+                                        {isActive ? labels.languages.current : option.locale}
+                                    </small>
+                                </span>
+                                {isActive && (
+                                    <span className="dashboard-language-check">
+                                        <CheckIcon />
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function TemplateSkeletonCard() {
     return (
         <article className="dashboard-template-card dashboard-template-card-skeleton">
@@ -106,11 +399,11 @@ function ProjectListSkeletonRow() {
     );
 }
 
-function formatProjectStatus(status) {
+function formatProjectStatus(status, labels) {
     const normalizedStatus = String(status || 'draft').trim().toLowerCase();
 
-    if (normalizedStatus === 'completed') return 'Completed';
-    if (normalizedStatus === 'draft') return 'Draft';
+    if (normalizedStatus === 'completed') return labels?.completed || 'Completed';
+    if (normalizedStatus === 'draft') return labels?.draft || 'Draft';
     return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
 }
 
@@ -146,34 +439,35 @@ function DashboardOverview({
     templatesLoading,
     templatesError,
     projects,
+    language,
+    copy,
 }) {
+    const overviewCopy = copy.overview;
+
     return (
         <>
             <section className="dashboard-hero-card">
                 <div className="dashboard-hero-copy">
-                    <p className="dashboard-eyebrow">Workspace</p>
-                    <h1>Pick a template and move straight into design.</h1>
-                    <p>
-                        Your studio is ready. Start from a product template, continue a saved idea,
-                        or keep your account details close at hand.
-                    </p>
+                    <p className="dashboard-eyebrow">{overviewCopy.heroEyebrow}</p>
+                    <h1>{overviewCopy.heroTitle}</h1>
+                    <p>{overviewCopy.heroDescription}</p>
                 </div>
 
                 <div className="dashboard-metric-grid">
                     <article className="dashboard-metric-card">
-                        <span>Templates</span>
+                        <span>{overviewCopy.metrics.templates}</span>
                         <strong>{templatesLoading ? '...' : templates.length}</strong>
-                        <small>Ready for customization</small>
+                        <small>{overviewCopy.metrics.templatesSub}</small>
                     </article>
                     <article className="dashboard-metric-card">
-                        <span>My Product</span>
+                        <span>{overviewCopy.metrics.products}</span>
                         <strong>{projects.length}</strong>
-                        <small>Saved drafts in workspace</small>
+                        <small>{overviewCopy.metrics.productsSub}</small>
                     </article>
                     <article className="dashboard-metric-card">
-                        <span>Account</span>
-                        <strong>{user?.email || 'Not available'}</strong>
-                        <small>Signed-in email</small>
+                        <span>{overviewCopy.metrics.account}</span>
+                        <strong>{user?.email || overviewCopy.notAvailable}</strong>
+                        <small>{overviewCopy.metrics.accountSub}</small>
                     </article>
                 </div>
             </section>
@@ -181,11 +475,11 @@ function DashboardOverview({
             <section className="dashboard-section-card">
                 <div className="dashboard-section-head">
                     <div>
-                        <p className="section-kicker">Dashboard</p>
-                        <h2>Choose a template to start designing.</h2>
+                        <p className="section-kicker">{overviewCopy.sectionKicker}</p>
+                        <h2>{overviewCopy.sectionTitle}</h2>
                     </div>
 
-                    <div className="template-filter-group" role="tablist" aria-label="Template product type">
+                    <div className="template-filter-group" role="tablist" aria-label={overviewCopy.templateFilterAria}>
                         {['all', 'tshirt', 'polo'].map((type) => (
                             <button
                                 key={type}
@@ -193,7 +487,7 @@ function DashboardOverview({
                                 className={`template-filter${productType === type ? ' active' : ''}`}
                                 onClick={() => onProductTypeChange(type)}
                             >
-                                {type === 'all' ? 'All products' : formatProductType(type)}
+                                {type === 'all' ? overviewCopy.allProducts : formatProductType(type, language)}
                             </button>
                         ))}
                     </div>
@@ -212,15 +506,15 @@ function DashboardOverview({
 
                     {!templatesLoading && templates.length === 0 && (
                         <div className="dashboard-empty-state">
-                            <h3>No templates are available right now.</h3>
-                            <p>Try another product filter or come back after the catalog sync finishes.</p>
+                            <h3>{overviewCopy.noTemplatesTitle}</h3>
+                            <p>{overviewCopy.noTemplatesDescription}</p>
                         </div>
                     )}
 
                     {!templatesLoading && templates.map((template) => (
                         <article key={template.id || template.slug} className="dashboard-template-card">
                             <div className="dashboard-template-card-top">
-                                <span className="template-type-chip">{formatProductType(template.productType)}</span>
+                                <span className="template-type-chip">{formatProductType(template.productType, language)}</span>
                                 <span className="template-slug-chip">{template.slug}</span>
                             </div>
 
@@ -231,13 +525,13 @@ function DashboardOverview({
                             <div className="dashboard-template-body">
                                 <h3>{template.name}</h3>
                                 <p>
-                                    {template.description || 'Ready-to-edit product shell for your next design.'}
+                                    {template.description || overviewCopy.fallbackTemplateDescription}
                                 </p>
                             </div>
 
                             <div className="dashboard-template-meta">
-                                <span>{template?.supportedSurfaces?.length || Object.keys(template?.surfaces || {}).length} surfaces</span>
-                                <span>{template?.availableColors?.length || 0} colors</span>
+                                <span>{template?.supportedSurfaces?.length || Object.keys(template?.surfaces || {}).length} {overviewCopy.surfacesLabel}</span>
+                                <span>{template?.availableColors?.length || 0} {overviewCopy.colorsLabel}</span>
                             </div>
 
                             <button
@@ -245,7 +539,7 @@ function DashboardOverview({
                                 className="primary-action dashboard-card-action"
                                 onClick={() => navigate(buildEditorUrl(template.id))}
                             >
-                                Design this template
+                                {overviewCopy.designButton}
                             </button>
                         </article>
                     ))}
@@ -255,7 +549,15 @@ function DashboardOverview({
     );
 }
 
-function ProductsView({ projects, projectsLoading, projectsError, refreshProjects, token }) {
+function ProductsView({
+    projects,
+    projectsLoading,
+    projectsError,
+    refreshProjects,
+    token,
+    language,
+    copy,
+}) {
     const [searchValue, setSearchValue] = useState('');
     const [sortValue, setSortValue] = useState('updated-desc');
     const [selectedIds, setSelectedIds] = useState([]);
@@ -264,6 +566,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
     const [actionError, setActionError] = useState('');
     const [actionMessage, setActionMessage] = useState('');
     const selectAllRef = useRef(null);
+    const productsCopy = copy.productsView;
 
     const filteredProjects = useMemo(() => {
         const normalizedSearchValue = searchValue.trim().toLowerCase();
@@ -318,8 +621,8 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
 
         const confirmed = window.confirm(
             normalizedIds.length === 1
-                ? 'Delete this product draft?'
-                : `Delete ${normalizedIds.length} selected product drafts?`
+                ? productsCopy.deleteConfirmSingle
+                : interpolateLabel(productsCopy.deleteConfirmMultiple, { count: normalizedIds.length })
         );
         if (!confirmed) return;
 
@@ -340,20 +643,20 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                 setSelectedIds((currentValue) => currentValue.filter((id) => !succeededIds.includes(id)));
                 setActionMessage(
                     succeededIds.length === 1
-                        ? 'Product deleted successfully.'
-                        : `${succeededIds.length} products deleted successfully.`
+                        ? productsCopy.deletedSingle
+                        : interpolateLabel(productsCopy.deletedMultiple, { count: succeededIds.length })
                 );
             }
 
             if (failedCount > 0) {
                 throw new Error(
                     failedCount === 1
-                        ? 'One product could not be deleted.'
-                        : `${failedCount} products could not be deleted.`
+                        ? productsCopy.deleteFailedSingle
+                        : interpolateLabel(productsCopy.deleteFailedMultiple, { count: failedCount })
                 );
             }
         } catch (error) {
-            setActionError(error?.message || 'Unable to delete the selected products.');
+            setActionError(error?.message || productsCopy.deleteFallbackError);
         } finally {
             setBusyIds([]);
             setIsDeleting(false);
@@ -364,8 +667,8 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
         <section className="dashboard-section-card dashboard-products-list-card">
             <div className="dashboard-section-head">
                 <div>
-                    <p className="section-kicker">My Product</p>
-                    <h2>Manage the product drafts already saved in your workspace.</h2>
+                    <p className="section-kicker">{productsCopy.sectionKicker}</p>
+                    <h2>{productsCopy.title}</h2>
                 </div>
 
                 <div className="dashboard-products-head-actions">
@@ -374,7 +677,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                         <input
                             id="dashboard-products-search"
                             type="search"
-                            placeholder="Search products"
+                            placeholder={productsCopy.searchPlaceholder}
                             value={searchValue}
                             onChange={(event) => setSearchValue(event.target.value)}
                         />
@@ -385,12 +688,12 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                         value={sortValue}
                         onChange={(event) => setSortValue(event.target.value)}
                     >
-                        <option value="updated-desc">Recently updated</option>
-                        <option value="updated-asc">Oldest updated</option>
-                        <option value="created-desc">Newest created</option>
-                        <option value="created-asc">Oldest created</option>
-                        <option value="name-asc">Name A-Z</option>
-                        <option value="status">Status</option>
+                        <option value="updated-desc">{productsCopy.sortOptions.updatedDesc}</option>
+                        <option value="updated-asc">{productsCopy.sortOptions.updatedAsc}</option>
+                        <option value="created-desc">{productsCopy.sortOptions.createdDesc}</option>
+                        <option value="created-asc">{productsCopy.sortOptions.createdAsc}</option>
+                        <option value="name-asc">{productsCopy.sortOptions.nameAsc}</option>
+                        <option value="status">{productsCopy.sortOptions.status}</option>
                     </select>
 
                     <button
@@ -398,7 +701,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                         className="ghost-action"
                         onClick={() => navigate('/editor')}
                     >
-                        Create product
+                        {productsCopy.createProduct}
                     </button>
                 </div>
             </div>
@@ -413,9 +716,9 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                 <div className="dashboard-products-bulkbar">
                     <div className="dashboard-products-bulkbar-copy">
                         {selectedIds.length > 0 ? (
-                            <strong>{selectedIds.length} selected</strong>
+                            <strong>{selectedIds.length} {productsCopy.selectedLabel}</strong>
                         ) : (
-                            <strong>Workspace updates</strong>
+                            <strong>{productsCopy.workspaceUpdates}</strong>
                         )}
                         {actionError && <span className="dashboard-products-error">{actionError}</span>}
                         {!actionError && actionMessage && <span className="dashboard-products-message">{actionMessage}</span>}
@@ -429,7 +732,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                                 onClick={() => setSelectedIds([])}
                                 disabled={isDeleting}
                             >
-                                Clear selection
+                                {productsCopy.clearSelection}
                             </button>
                         )}
                         <button
@@ -438,7 +741,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                             onClick={() => handleDeleteProjects(selectedIds)}
                             disabled={selectedIds.length === 0 || isDeleting}
                         >
-                            {isDeleting ? 'Deleting...' : 'Delete selected'}
+                            {isDeleting ? productsCopy.deleting : productsCopy.deleteSelected}
                         </button>
                     </div>
                 </div>
@@ -454,13 +757,13 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                             onChange={toggleAllVisible}
                             disabled={projectsLoading || filteredProjects.length === 0}
                         />
-                        <span>Select all</span>
+                        <span>{productsCopy.selectAll}</span>
                     </label>
-                    <span>Product</span>
-                    <span>Type</span>
-                    <span>Updated</span>
-                    <span>Status</span>
-                    <span className="dashboard-products-actions-head">Actions</span>
+                    <span>{productsCopy.columns.product}</span>
+                    <span>{productsCopy.columns.type}</span>
+                    <span>{productsCopy.columns.updated}</span>
+                    <span>{productsCopy.columns.status}</span>
+                    <span className="dashboard-products-actions-head">{productsCopy.columns.actions}</span>
                 </div>
 
                 <div className="dashboard-products-table-body">
@@ -470,15 +773,15 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
 
                     {!projectsLoading && projects.length === 0 && (
                         <div className="dashboard-empty-state">
-                            <h3>No saved products yet.</h3>
-                            <p>Your projects will appear here after you save them from the editor.</p>
+                            <h3>{productsCopy.noProjectsTitle}</h3>
+                            <p>{productsCopy.noProjectsDescription}</p>
                         </div>
                     )}
 
                     {!projectsLoading && projects.length > 0 && filteredProjects.length === 0 && (
                         <div className="dashboard-empty-state">
-                            <h3>No products matched that search.</h3>
-                            <p>Try another keyword or clear the search field.</p>
+                            <h3>{productsCopy.noSearchTitle}</h3>
+                            <p>{productsCopy.noSearchDescription}</p>
                         </div>
                     )}
 
@@ -517,24 +820,24 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                                         >
                                             {project.name}
                                         </button>
-                                        <p>{formatProductType(project.productType)} product draft</p>
-                                        <span>Template ID: {project.templateId}</span>
+                                        <p>{formatProductType(project.productType, language)} {productsCopy.productDraftSuffix}</p>
+                                        <span>{productsCopy.templateIdLabel}: {project.templateId}</span>
                                     </div>
                                 </div>
 
                                 <div className="dashboard-products-meta-cell">
-                                    <strong>{formatProductType(project.productType)}</strong>
+                                    <strong>{formatProductType(project.productType, language)}</strong>
                                     <span>{project.productType || 'custom'}</span>
                                 </div>
 
                                 <div className="dashboard-products-meta-cell">
-                                    <strong>{formatDateTime(project.updatedAt)}</strong>
-                                    <span>Created {formatDateTime(project.createdAt)}</span>
+                                    <strong>{formatDateTime(project.updatedAt, language)}</strong>
+                                    <span>{productsCopy.createdLabel} {formatDateTime(project.createdAt, language)}</span>
                                 </div>
 
                                 <div className="dashboard-products-status-cell">
                                     <span className={`dashboard-products-status status-${project.status || 'draft'}`}>
-                                        {formatProjectStatus(project.status)}
+                                        {formatProjectStatus(project.status, productsCopy.statusLabels)}
                                     </span>
                                 </div>
 
@@ -543,7 +846,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                                         type="button"
                                         className="dashboard-products-icon-btn"
                                         onClick={() => navigate(buildEditorUrl(project.templateId, project.id))}
-                                        title="Resume in studio"
+                                        title={productsCopy.resumeInStudio}
                                     >
                                         <EditIcon />
                                     </button>
@@ -552,7 +855,7 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
                                         className="dashboard-products-icon-btn danger"
                                         onClick={() => handleDeleteProjects([project.id])}
                                         disabled={isBusy || isDeleting}
-                                        title="Delete product"
+                                        title={productsCopy.deleteProduct}
                                     >
                                         <TrashIcon />
                                     </button>
@@ -566,13 +869,15 @@ function ProductsView({ projects, projectsLoading, projectsError, refreshProject
     );
 }
 
-function AccountView({ user, onLogout }) {
+function AccountView({ user, onLogout, copy }) {
+    const accountCopy = copy.accountView;
+
     return (
         <section className="dashboard-section-card">
             <div className="dashboard-section-head">
                 <div>
-                    <p className="section-kicker">Account</p>
-                    <h2>Keep your workspace identity simple and visible.</h2>
+                    <p className="section-kicker">{accountCopy.sectionKicker}</p>
+                    <h2>{accountCopy.title}</h2>
                 </div>
             </div>
 
@@ -583,19 +888,19 @@ function AccountView({ user, onLogout }) {
                     </div>
 
                     <div className="dashboard-account-copy">
-                        <h3>{user?.displayName || 'Workspace user'}</h3>
-                        <p>{user?.email || 'No email available'}</p>
+                        <h3>{user?.displayName || accountCopy.fallbackName}</h3>
+                        <p>{user?.email || accountCopy.noEmail}</p>
                     </div>
                 </div>
 
                 <div className="dashboard-account-details">
                     <div className="dashboard-detail-row">
-                        <span>Email</span>
-                        <strong>{user?.email || 'No email available'}</strong>
+                        <span>{accountCopy.emailLabel}</span>
+                        <strong>{user?.email || accountCopy.noEmail}</strong>
                     </div>
                     <div className="dashboard-detail-row">
-                        <span>Status</span>
-                        <strong>Authenticated</strong>
+                        <span>{accountCopy.statusLabel}</span>
+                        <strong>{accountCopy.authenticated}</strong>
                     </div>
                 </div>
 
@@ -605,7 +910,7 @@ function AccountView({ user, onLogout }) {
                         className="header-outline-action"
                         onClick={onLogout}
                     >
-                        Log out
+                        {accountCopy.logout}
                     </button>
                 </div>
             </div>
@@ -615,8 +920,16 @@ function AccountView({ user, onLogout }) {
 
 export default function DashboardPage({ search }) {
     const { isAuthenticated, isInitializing, user, logout, token } = useAuth();
+    const { language, setLanguage, languageOptions } = useLanguage();
     const [productType, setProductType] = useState('all');
     const currentTab = useMemo(() => resolveDashboardTab(search), [search]);
+    const copy = DASHBOARD_COPY[language] || DASHBOARD_COPY.en;
+    const dashboardTabs = useMemo(() => (
+        DASHBOARD_TABS.map((item) => ({
+            ...item,
+            label: copy.tabs[item.labelKey] || item.labelKey,
+        }))
+    ), [copy]);
     const {
         templates,
         templatesLoading,
@@ -637,12 +950,12 @@ export default function DashboardPage({ search }) {
         return (
             <div className="route-fallback">
                 <div className="route-fallback-dot" />
-                <span>Preparing your workspace...</span>
+                <span>{copy.loadingWorkspace}</span>
             </div>
         );
     }
 
-    const activeTabMeta = DASHBOARD_TABS.find((item) => item.key === currentTab) || DASHBOARD_TABS[0];
+    const activeTabMeta = dashboardTabs.find((item) => item.key === currentTab) || dashboardTabs[0];
     const userLabel = user?.displayName || user?.email || APP_CONFIG.projectName;
 
     const handleLogout = async () => {
@@ -657,12 +970,12 @@ export default function DashboardPage({ search }) {
                     <span className="dashboard-brand-mark">P</span>
                     <div className="dashboard-brand-copy">
                         <strong>{APP_CONFIG.projectName}</strong>
-                        <small>Creator workspace</small>
+                        <small>{copy.overview.heroEyebrow}</small>
                     </div>
                 </button>
 
                 <nav className="dashboard-sidebar-nav" aria-label="Workspace sections">
-                    {DASHBOARD_TABS.map((item) => (
+                    {dashboardTabs.map((item) => (
                         <SidebarNavButton
                             key={item.key}
                             isActive={item.key === currentTab}
@@ -673,6 +986,13 @@ export default function DashboardPage({ search }) {
                     ))}
                 </nav>
 
+                <LanguageSidebarControl
+                    language={language}
+                    setLanguage={setLanguage}
+                    languageOptions={languageOptions}
+                    labels={copy}
+                />
+
                 <button
                     type="button"
                     className={`dashboard-account-summary${currentTab === 'account' ? ' active' : ''}`}
@@ -682,8 +1002,8 @@ export default function DashboardPage({ search }) {
                         {getInitials(userLabel)}
                     </span>
                     <span className="dashboard-account-summary-copy">
-                        <strong>Account</strong>
-                        <small>{user?.email || 'No email available'}</small>
+                        <strong>{copy.tabs.account}</strong>
+                        <small>{user?.email || copy.accountView.noEmail}</small>
                     </span>
                 </button>
             </aside>
@@ -691,14 +1011,22 @@ export default function DashboardPage({ search }) {
             <main className="dashboard-main">
                 <div className="dashboard-main-head">
                     <div>
-                        <p className="dashboard-eyebrow">Signed in</p>
+                        <p className="dashboard-eyebrow">{copy.signedIn}</p>
                         <h1>{activeTabMeta.label}</h1>
                         <p className="dashboard-main-subtitle">
-                            {currentTab === 'dashboard' && 'Browse templates and start a new design flow.'}
-                            {currentTab === 'products' && 'Check the projects you already created and continue working on them.'}
-                            {currentTab === 'account' && 'See the email currently connected to this workspace.'}
+                            {currentTab === 'dashboard' && copy.dashboardSubtitles.dashboard}
+                            {currentTab === 'products' && copy.dashboardSubtitles.products}
+                            {currentTab === 'account' && copy.dashboardSubtitles.account}
                         </p>
                     </div>
+
+                    <button
+                        type="button"
+                        className="primary-action"
+                        onClick={() => navigate('/editor')}
+                    >
+                        {copy.openDesignStudio}
+                    </button>
                 </div>
 
                 {currentTab === 'dashboard' && (
@@ -710,6 +1038,8 @@ export default function DashboardPage({ search }) {
                         templatesLoading={templatesLoading}
                         templatesError={templatesError}
                         projects={projects}
+                        language={language}
+                        copy={copy}
                     />
                 )}
 
@@ -720,11 +1050,13 @@ export default function DashboardPage({ search }) {
                         projectsError={projectsError}
                         refreshProjects={refreshProjects}
                         token={token}
+                        language={language}
+                        copy={copy}
                     />
                 )}
 
                 {currentTab === 'account' && (
-                    <AccountView user={user} onLogout={handleLogout} />
+                    <AccountView user={user} onLogout={handleLogout} copy={copy} />
                 )}
             </main>
         </div>
@@ -777,6 +1109,39 @@ function TrashIcon() {
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
                 d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21a2 2 0 0 1-2-2V8h16v11a2 2 0 0 1-2 2H6Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function LanguageIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm6.92 9h-3.06a15.56 15.56 0 0 0-1.24-5.05A8.03 8.03 0 0 1 18.92 11ZM12 4.04c1.11 1.34 1.99 3.94 2.17 6.96H9.83C10.01 7.98 10.89 5.38 12 4.04ZM9.38 5.95A15.56 15.56 0 0 0 8.14 11H5.08a8.03 8.03 0 0 1 4.3-5.05ZM4.26 13h3.88a15.9 15.9 0 0 0 1.24 5.44A8.02 8.02 0 0 1 4.26 13ZM12 19.96c-1.11-1.34-1.99-3.94-2.17-6.96h4.34c-.18 3.02-1.06 5.62-2.17 6.96Zm2.62-1.52A15.9 15.9 0 0 0 15.86 13h3.88a8.02 8.02 0 0 1-5.12 5.44Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function ChevronDownIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="m6.7 9.3 5.3 5.3 5.3-5.3 1.4 1.4-6.7 6.7-6.7-6.7 1.4-1.4Z"
+                fill="currentColor"
+            />
+        </svg>
+    );
+}
+
+function CheckIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                d="m9.55 16.6-4.2-4.2 1.4-1.4 2.8 2.8 7-7 1.4 1.4-8.4 8.4Z"
                 fill="currentColor"
             />
         </svg>

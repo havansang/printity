@@ -1590,6 +1590,110 @@ body {
   gap: 8px;
 }
 
+.dashboard-language-switcher {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-language-trigger {
+  justify-content: flex-start;
+}
+
+.dashboard-language-trigger-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+
+.dashboard-language-trigger-copy small {
+  color: #6e684f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboard-language-chevron,
+.dashboard-language-check {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dashboard-language-chevron {
+  color: #6e684f;
+  transition: transform var(--app-transition);
+}
+
+.dashboard-language-chevron.open {
+  transform: rotate(180deg);
+}
+
+.dashboard-language-chevron svg,
+.dashboard-language-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dashboard-language-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(86, 79, 50, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(39, 35, 20, 0.08);
+}
+
+.dashboard-language-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  padding: 12px;
+  color: #2f3108;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--app-transition),
+    border-color var(--app-transition),
+    transform var(--app-transition);
+}
+
+.dashboard-language-option:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(86, 79, 50, 0.12);
+}
+
+.dashboard-language-option.active {
+  background: #f6f4ed;
+  border-color: rgba(86, 79, 50, 0.12);
+}
+
+.dashboard-language-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-language-option-copy strong {
+  color: #2f3108;
+  font-size: 14px;
+}
+
+.dashboard-language-option-copy small {
+  color: #6e684f;
+  font-size: 12px;
+}
+
 .dashboard-sidebar-link,
 .dashboard-account-summary {
   display: flex;
