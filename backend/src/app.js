@@ -15,6 +15,7 @@ const app = express();
 const allowedOrigins = env.CLIENT_URL.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowAllOrigins = env.NODE_ENV !== 'production' || allowedOrigins.includes('*');
 
 ensureUploadRootExists();
 
@@ -22,7 +23,12 @@ app.disable('x-powered-by');
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (
+        !origin
+        || allowAllOrigins
+        || allowedOrigins.length === 0
+        || allowedOrigins.includes(origin)
+      ) {
         callback(null, true);
         return;
       }

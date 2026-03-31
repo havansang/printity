@@ -30,13 +30,6 @@ export default function ProjectsPanel({
                     <p className="section-kicker">Solutions</p>
                     <h2>Manage saved drafts and launch-ready product ideas in one place.</h2>
                 </div>
-                <button
-                    type="button"
-                    className="ghost-action"
-                    onClick={() => navigate('/editor')}
-                >
-                    Open design studio
-                </button>
             </div>
 
             {!isAuthenticated && !isInitializing && (

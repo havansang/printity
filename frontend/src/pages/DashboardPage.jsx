@@ -602,13 +602,6 @@ function AccountView({ user, onLogout }) {
                 <div className="dashboard-account-actions">
                     <button
                         type="button"
-                        className="primary-action"
-                        onClick={() => navigate('/editor')}
-                    >
-                        Open studio
-                    </button>
-                    <button
-                        type="button"
                         className="header-outline-action"
                         onClick={onLogout}
                     >
@@ -706,14 +699,6 @@ export default function DashboardPage({ search }) {
                             {currentTab === 'account' && 'See the email currently connected to this workspace.'}
                         </p>
                     </div>
-
-                    <button
-                        type="button"
-                        className="primary-action"
-                        onClick={() => navigate('/editor')}
-                    >
-                        Open design studio
-                    </button>
                 </div>
 
                 {currentTab === 'dashboard' && (

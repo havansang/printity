@@ -39,9 +39,6 @@ function AuthSessionCard({ user, logout, centered = false }) {
                 <button type="button" className="primary-action" onClick={() => navigate('/dashboard')}>
                     Go to dashboard
                 </button>
-                <button type="button" className="secondary-action" onClick={() => navigate('/editor')}>
-                    Open studio
-                </button>
                 <button type="button" className="ghost-action" onClick={() => logout()}>
                     Log out
                 </button>

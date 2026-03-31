@@ -792,6 +792,30 @@
   background: transparent !important;
 }
 
+.scene-center-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.scene-center-guide {
+  position: absolute;
+  display: none;
+  background: rgba(255, 68, 84, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.scene-center-guide-vertical {
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.scene-center-guide-horizontal {
+  height: 2px;
+  transform: translateY(-50%);
+}
+
 .surface-tabs {
   display: flex;
   gap: 0;

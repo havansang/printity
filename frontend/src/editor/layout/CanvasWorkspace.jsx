@@ -7,6 +7,7 @@ const CANVAS_W = 360;
 const CANVAS_H = 560;
 const CONTROL_GREEN = '#6abf57';
 const CONTROL_BG = '#ffffff';
+const SNAP_GUIDE_TOLERANCE_PX = 6;
 const SVG_TEXT_CACHE = new Map();
 const SVG_TEXT_REQUEST_CACHE = new Map();
 const TEXTAREA_PATCH_FLAG = '__editorViewportTextareaPatch';
@@ -176,6 +177,11 @@ export default function CanvasWorkspace() {
     const loadIdRef = useRef(0);
     const visualScaleRef = useRef(1);
     const basePrintAreaRef = useRef({ x: 0, y: 0 });
+    const centerGuideLayerRef = useRef(null);
+    const centerGuideVerticalRef = useRef(null);
+    const centerGuideHorizontalRef = useRef(null);
+    const centerGuideAreaRef = useRef(null);
+    const centerGuideStateRef = useRef({ showVertical: false, showHorizontal: false });
     const pushHistoryRef = useRef(null);
     const syncLayersRef = useRef(null);
 
@@ -334,12 +340,112 @@ export default function CanvasWorkspace() {
         canvas.requestRenderAll();
     }, []);
 
+    const updateCenterGuideArea = useCallback((area) => {
+        const normalizedArea = area ? {
+            left: Number(area.left) || 0,
+            top: Number(area.top) || 0,
+            width: Number(area.width) || 0,
+            height: Number(area.height) || 0,
+        } : null;
+
+        centerGuideAreaRef.current = normalizedArea;
+        const verticalGuideEl = centerGuideVerticalRef.current;
+        const horizontalGuideEl = centerGuideHorizontalRef.current;
+
+        if (!normalizedArea || !verticalGuideEl || !horizontalGuideEl) {
+            return;
+        }
+
+        verticalGuideEl.style.left = `${normalizedArea.left + (normalizedArea.width / 2)}px`;
+        verticalGuideEl.style.top = `${normalizedArea.top}px`;
+        verticalGuideEl.style.height = `${normalizedArea.height}px`;
+
+        horizontalGuideEl.style.left = `${normalizedArea.left}px`;
+        horizontalGuideEl.style.top = `${normalizedArea.top + (normalizedArea.height / 2)}px`;
+        horizontalGuideEl.style.width = `${normalizedArea.width}px`;
+    }, []);
+
+    const setCenterGuidesVisible = useCallback((nextState) => {
+        const nextShowVertical = Boolean(nextState?.showVertical);
+        const nextShowHorizontal = Boolean(nextState?.showHorizontal);
+        const currentState = centerGuideStateRef.current;
+
+        if (
+            currentState.showVertical === nextShowVertical
+            && currentState.showHorizontal === nextShowHorizontal
+        ) {
+            return;
+        }
+
+        centerGuideStateRef.current = {
+            showVertical: nextShowVertical,
+            showHorizontal: nextShowHorizontal,
+        };
+
+        const verticalGuideEl = centerGuideVerticalRef.current;
+        const horizontalGuideEl = centerGuideHorizontalRef.current;
+
+        if (verticalGuideEl) {
+            verticalGuideEl.style.display = nextShowVertical ? 'block' : 'none';
+        }
+
+        if (horizontalGuideEl) {
+            horizontalGuideEl.style.display = nextShowHorizontal ? 'block' : 'none';
+        }
+    }, []);
+
+    const hideCenterGuides = useCallback(() => {
+        setCenterGuidesVisible({ showVertical: false, showHorizontal: false });
+    }, [setCenterGuidesVisible]);
+
+    const updateCenterGuidesForObject = useCallback((obj) => {
+        const pa = printArea;
+        const guideArea = centerGuideAreaRef.current;
+
+        if (!obj || !pa || !guideArea) {
+            hideCenterGuides();
+            return;
+        }
+
+        const printAreaCenterX = (Number(pa.x) || 0) + ((Number(pa.width) || 0) / 2);
+        const printAreaCenterY = (Number(pa.y) || 0) + ((Number(pa.height) || 0) / 2);
+        const centerPoint = obj.getCenterPoint?.();
+        if (!centerPoint) {
+            hideCenterGuides();
+            return;
+        }
+
+        const tolerance = SNAP_GUIDE_TOLERANCE_PX / Math.max(visualScaleRef.current || 1, 0.0001);
+        const shouldSnapX = Math.abs((Number(centerPoint.x) || 0) - printAreaCenterX) <= tolerance;
+        const shouldSnapY = Math.abs((Number(centerPoint.y) || 0) - printAreaCenterY) <= tolerance;
+
+        if (shouldSnapX || shouldSnapY) {
+            obj.setPositionByOrigin(
+                new Point(
+                    shouldSnapX ? printAreaCenterX : centerPoint.x,
+                    shouldSnapY ? printAreaCenterY : centerPoint.y,
+                ),
+                'center',
+                'center',
+            );
+            obj.setCoords();
+        }
+
+        setCenterGuidesVisible({
+            showVertical: shouldSnapX,
+            showHorizontal: shouldSnapY,
+        });
+    }, [hideCenterGuides, printArea, setCenterGuidesVisible]);
+
     const alignCanvasToPrintArea = useCallback(() => {
         const canvas = fabricRef.current;
         if (!canvas) return;
 
         const pa = measurePrintArea();
-        if (!pa) return;
+        if (!pa) {
+            updateCenterGuideArea(null);
+            return;
+        }
 
         const wrapper = canvas.wrapperEl;
         const sourceW = canvas.getWidth() || CANVAS_W;
@@ -356,8 +462,9 @@ export default function CanvasWorkspace() {
         wrapper.style.transform = `scale(${scale})`;
         wrapper.style.zIndex = '2';
         visualScaleRef.current = scale;
+        updateCenterGuideArea(pa);
         applyInteractiveHandleScale(scale);
-    }, [applyInteractiveHandleScale, measurePrintArea]);
+    }, [applyInteractiveHandleScale, measurePrintArea, updateCenterGuideArea]);
 
     const syncViewportToPrintArea = useCallback(() => {
         const canvas = fabricRef.current;
@@ -534,11 +641,17 @@ export default function CanvasWorkspace() {
             applyInteractiveHandleScale(visualScaleRef.current, active ?? null);
             if (active?._layerId) setSelectedLayerId(active._layerId);
             setSelectedObject(active ?? null);
+            hideCenterGuides();
         };
-        const onCleared = () => { setSelectedLayerId(null); setSelectedObject(null); };
+        const onCleared = () => {
+            setSelectedLayerId(null);
+            setSelectedObject(null);
+            hideCenterGuides();
+        };
         const onModified = () => {
             syncLayersRef.current?.();
             pushHistoryRef.current?.();
+            hideCenterGuides();
         };
         const onTextEditingExited = () => {
             syncLayersRef.current?.();
@@ -547,14 +660,22 @@ export default function CanvasWorkspace() {
         const onMouseDown = (event) => {
             assignTextEditingContainer(event?.target ?? null);
         };
+        const onMouseUp = () => {
+            hideCenterGuides();
+        };
         const onTextEditingEntered = (event) => {
             assignTextEditingContainer(event?.target ?? null);
+        };
+        const onObjectMoving = (event) => {
+            updateCenterGuidesForObject(event?.target ?? null);
         };
 
         canvas.on('selection:created', onSelected);
         canvas.on('selection:updated', onSelected);
         canvas.on('selection:cleared', onCleared);
         canvas.on('mouse:down', onMouseDown);
+        canvas.on('mouse:up', onMouseUp);
+        canvas.on('object:moving', onObjectMoving);
         canvas.on('object:modified', onModified);
         canvas.on('text:editing:entered', onTextEditingEntered);
         canvas.on('text:editing:exited', onTextEditingExited);
@@ -576,6 +697,8 @@ export default function CanvasWorkspace() {
             canvas.off('selection:updated', onSelected);
             canvas.off('selection:cleared', onCleared);
             canvas.off('mouse:down', onMouseDown);
+            canvas.off('mouse:up', onMouseUp);
+            canvas.off('object:moving', onObjectMoving);
             canvas.off('object:modified', onModified);
             canvas.off('text:editing:entered', onTextEditingEntered);
             canvas.off('text:editing:exited', onTextEditingExited);
@@ -619,8 +742,16 @@ export default function CanvasWorkspace() {
     useEffect(() => {
         if (!isPreviewMode) {
             queueAlign();
+        } else {
+            hideCenterGuides();
         }
-    }, [isPreviewMode, queueAlign]);
+    }, [hideCenterGuides, isPreviewMode, queueAlign]);
+
+    useEffect(() => {
+        const guideLayerEl = centerGuideLayerRef.current;
+        if (!guideLayerEl) return;
+        guideLayerEl.style.display = isPreviewMode ? 'none' : 'block';
+    }, [isPreviewMode]);
 
     useEffect(() => {
         const sceneEl = sceneRef.current;
@@ -685,6 +816,16 @@ export default function CanvasWorkspace() {
                         className="mockup-svg"
                         aria-label={`${templateDef?.name || 'Product'} template`}
                     />
+                    <div ref={centerGuideLayerRef} className="scene-center-guides" aria-hidden="true">
+                        <span
+                            ref={centerGuideVerticalRef}
+                            className="scene-center-guide scene-center-guide-vertical"
+                        />
+                        <span
+                            ref={centerGuideHorizontalRef}
+                            className="scene-center-guide scene-center-guide-horizontal"
+                        />
+                    </div>
                     <canvas ref={canvasElRef} />
                 </div>
             </Positioner>
